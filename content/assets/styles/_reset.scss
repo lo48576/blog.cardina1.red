@@ -1,0 +1,44 @@
+/* Use box sizing as default. */
+html {
+	box-sizing: border-box;
+}
+
+*, *::before, *::after {
+	box-sizing: inherit;
+}
+
+/* Remove default margin and padding. */
+body, article, section, aside,
+h1, h2, h3, h4, h5, h6,
+p,
+ul, ol, li,
+figure, figcaption,
+blockquote,
+pre,
+dl, dt, dd,
+table, thead, tbody, tfoot, tr, th, td, caption,
+details, summary {
+	margin: 0;
+	padding: 0;
+}
+
+/* Defaults for body and global text. */
+body {
+	// Expand body height if it is shorter than viewport.
+	min-height: 100vh;
+}
+
+* {
+	// Use `em` but not `rem`, to support elements with various font sizes.
+	line-height: 1.5em;
+}
+
+/* Reset list style. */
+ul, ol {
+	list-style: none;
+}
+
+/* Skip underline when it increases the readability. */
+a {
+	text-decoration-skip-ink: auto;
+}

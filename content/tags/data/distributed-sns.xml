@@ -1,0 +1,23 @@
+---
+title: "分散SNS"
+kind: tag
+imply:
+  - sns
+
+excerpt: "分散 SNS の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-distributed-sns"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>分散SNS</title>
+
+<p>
+	分散 SNS の話題。
+</p>
+
+</article>

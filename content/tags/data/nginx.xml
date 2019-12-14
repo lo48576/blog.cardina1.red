@@ -1,0 +1,23 @@
+---
+title: "nginx"
+kind: tag
+imply:
+  - server
+
+excerpt: "nginx の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-nginx"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>nginx</title>
+
+<p>
+	nginx の話題。
+</p>
+
+</article>

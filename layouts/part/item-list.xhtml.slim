@@ -1,0 +1,16 @@
+- header_level = @header_level || 2
+- @target_items.each do |item|
+  section
+    *{tag: "h#{header_level}"}
+      == link_to h(item[:title]), item
+    aside.article-info
+      / Article metadata
+      == render '/part/article-dates.*', target: item
+      == render '/part/tags.*', target: item
+    div
+      / Excerpt
+      - if excerpt = item[:excerpt]
+        p
+          = excerpt
+      - else
+        p (No summary provided.)

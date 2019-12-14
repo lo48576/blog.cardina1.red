@@ -1,0 +1,23 @@
+---
+title: "Rust"
+kind: tag
+imply:
+  - programming
+
+excerpt: "プログラミング言語 Rust の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-prog-rust"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>Rust</title>
+
+<p>
+	プログラミング言語 Rust の話題。
+</p>
+
+</article>

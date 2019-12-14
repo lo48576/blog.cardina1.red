@@ -1,0 +1,23 @@
+---
+title: "Gentoo Linux"
+kind: tag
+imply:
+  - linux
+
+excerpt: "Gentoo Linux の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-gentoo-linux"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Gentoo Linux</title>
+
+<p>
+	Gentoo Linux の話題。
+</p>
+
+</article>

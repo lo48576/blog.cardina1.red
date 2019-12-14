@@ -1,0 +1,21 @@
+---
+title: "TeX"
+kind: tag
+
+excerpt: "TeX や LaTeX の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-tex"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>TeX</title>
+
+<p>
+	TeX や LaTeX の話題。
+</p>
+
+</article>

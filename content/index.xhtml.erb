@@ -1,0 +1,29 @@
+---
+title: とっぷぺーじ
+created_at: 2016-03-12T00:40:15+0900
+---
+
+<section>
+	<h1>何とは言わない天然水飲みたい</h1>
+	<section>
+		<h2>Archive</h2>
+		<ul>
+			<li>
+				<%= link_to '一覧', @items[source_path_for_article_list] %>
+			</li>
+			<li>
+				<%= link_to '日付', @items[source_path_for_archive] %>
+			</li>
+		</ul>
+	</section>
+	<section>
+		<h2>Recent articles</h2>
+		<%= render '/part/item-list.*', target_items: sorted_articles[0...10], header_level: 3 %>
+	</section>
+	<section>
+		<h2>おまえだれ</h2>
+		<p>
+			<a href="https://www.cardina1.red/about/">あばうと</a>
+		</p>
+	</section>
+</section>

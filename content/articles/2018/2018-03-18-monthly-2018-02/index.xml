@@ -1,0 +1,376 @@
+---
+created_at: 2018-03-18T23:26:43+09:00
+published_at: 2018-03-18T23:26:43+09:00
+format: article2019
+title: "Monthly report 2018-02"
+tags:
+  - diary
+kind: article
+
+excerpt: "2018年 02月 まとめ"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2018-03-18-monthly-2018-02"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Monthly report 2018-02</title>
+<p>
+	2018-02 の日記。
+</p>
+
+<section xml:id="news">
+	<title>ニュース・知ったこと</title>
+
+	<section xml:id="rust-1-24-release">
+		<title>Rust 1.24 リリース 🎉 (2018-02-15)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://blog.rust-lang.org/2018/02/15/Rust-1.24.html">Announcing Rust 1.24 - The Rust Programming Language Blog</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/rust-lang/rust/blob/master/RELEASES.md#version-1240-2018-02-15">rust/RELEASES.md at master · rust-lang/rust</link>
+			</li>
+			<li>
+				<link xl:href="https://www.rust-lang.org/ja-JP/">プログラミング言語 Rust</link>
+			</li>
+		</ul>
+
+		<p>
+			めでたい。
+		</p>
+		<p>
+			公式の記事でも解説されているように、 rustfmt が rustup 経由で利用可能になったことと、 incremental compilation がデフォルトで有効になったあたりが目玉。
+			とはいえその辺りは普段から nightly でどうにかしている人も多そうなので、今回のリリースはそこまで劇的ではないといえそう。
+			(私は FFI はあまり使ってないので……)
+		</p>
+	</section>
+
+	<section xml:id="rayon-1-0-release">
+		<title>Rayon 1.0 リリース (2018-02-15)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://github.com/rayon-rs/rayon">rayon-rs/rayon: Rayon: A data parallelism library for Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://twitter.com/nikomatsakis/status/964058038259896320">Niko Matsakis on Twitter: "Rayon 1.0 is released! 🍾 #rustlang https://t.co/6aEwIrEesi"</link>
+			</li>
+		</ul>
+
+		<p>
+			Rayon は Rust のイテレータによる処理を並列化するライブラリ。
+			原理については、記事 <link xl:href="http://smallcultfollowing.com/babysteps/blog/2015/12/18/rayon-data-parallelism-in-rust/">Rayon: data parallelism in Rust</link> が(古くなっているかもしれないが)参考になる。
+		</p>
+	</section>
+
+	<section xml:id="systemd-run-user-bug-fixed">
+		<title>systemd-run コマンドのバグ修正 (2018-02-16)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://github.com/systemd/systemd/issues/3388">systemd-run --user --scope ... doesn't work with unified cgroup hierarchy · Issue #3388 · systemd/systemd</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/systemd/systemd/pull/8125">let's make "systemd-run --scope --user" work again on cgroupsv2 by poettering · Pull Request #8125 · systemd/systemd</link>
+			</li>
+		</ul>
+
+		<p>
+			systemd で cgroup を unified hierarchy で使っていると、 <code>systemd-run --user</code> をユーザ権限で動かせないというバグがあったが、これが修正された。
+			個人的に <code>systemd-run --user</code> は常用しているので、とてもうれしい。
+			systemd-238 が楽しみだ。
+		</p>
+		<p>
+			<code>systemd-run --user</code> は<link xl:href="https://mastodon.cardina1.red/@lo48576/99047174688828350">こういうこと</link>ができるので大変便利。
+		</p>
+	</section>
+
+	<section xml:id="apple-unicode-crash">
+		<title>Apple 製品の一部で、特定文字でアプリがクラッシュするバグが発見される (2018-02-16)</title>
+
+		<ul>
+			<li>
+				<link xl:href="http://www.itmedia.co.jp/enterprise/articles/1802/16/news067.html">インドの文字でiOSがクラッシュ、メッセージアプリが使用不能に - ITmedia エンタープライズ</link>
+			</li>
+			<li>
+				<link xl:href="http://www.itmedia.co.jp/news/articles/1802/18/news040.html">テルグ語バグのせいでmstdn.jpでクラッシュし続けた話 - ITmedia NEWS</link>
+			</li>
+			<li>
+				<link xl:href="http://www.itmedia.co.jp/news/articles/1802/20/news129.html">iOSとMacがテルグ語バグに対応　安心してマストドン探索可能に - ITmedia NEWS</link> (2018-02-20)
+			</li>
+		</ul>
+	</section>
+
+	<section xml:id="rust-128-bit-integer-fcp-merged">
+		<title>Rust の i128, u128 の FCP が 通った (2018-02-17)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://github.com/rust-lang/rust/issues/35118">Tracking issue for 128-bit integer support (RFC 1504) · Issue #35118 · rust-lang/rust</link>
+			</li>
+		</ul>
+
+		<p>
+			UUID とかがひとつの整数に入るようになると楽なので楽しみ。
+		</p>
+	</section>
+
+	<section xml:id="kancolle-twitter-official-banned">
+		<title>艦これの twitter 公式アカウントが凍結される (解除済) (2018-02-22)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://news.yahoo.co.jp/byline/mikamiyoh/20180222-00081891/">追記：DMCA虚偽申請か？：137万フォロワーの「艦これ」公式Twitterが凍結された！(三上洋) - 個人 - Yahoo!ニュース</link>
+			</li>
+		</ul>
+
+		<p>
+			まあ twitter だし、不思議なことは何もないよね……
+		</p>
+		<p>
+			と思っていたが、どうやら DMCA 虚偽申請によるものらしいので、 twitter 運営の粗悪さだけの問題ではなく、運営が海外にあることや海外の法に縛られること自体の問題についても考慮しておくべきだろう。
+		</p>
+		<p>
+			<link xl:href="https://twitter.com/G_beize/status/966530533994807296">こんなツイート</link>を目にして、せやな(<link xl:href="https://twitter.com/lo48576/status/963363161708544000">別件を思い出しながら</link>)と思った。
+		</p>
+	</section>
+
+	<section xml:id="futures-0-2-rc">
+		<title>futures 0.2 のリリースは近い (2018-02-27)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://github.com/rust-lang-nursery/futures-rs">rust-lang-nursery/futures-rs: Zero-cost futures and streams in Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://aturon.github.io/2018/02/27/futures-0-2-RC/">Futures 0.2 is nearing release · Aaron Turon</link>
+			</li>
+		</ul>
+
+		<p>
+			非同期処理を実現するための crate である futures の 0.2 のリリースが近いらしい。
+			それなりにいろいろ変化していそうなので、確認しなおす必要がありそう。
+		</p>
+	</section>
+</section>
+
+<section xml:id="public-activities">
+	<title>ﾊﾟﾌﾞﾘｯｸ活動</title>
+
+	<section xml:id="pullreq-rusttype-merged">
+		<title>大昔に出した rusttype へのプルリクなどが merge された (2018-02-13)</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/redox-os/rusttype">redox-os/rusttype: A pure Rust alternative to libraries like FreeType.</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/redox-os/rusttype/pull/17">Make `gpu_cache` optional by lo48576 · Pull Request #17 · redox-os/rusttype</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/redox-os/rusttype/pull/82">Add an entry for `image` example in Cargo.toml by lo48576 · Pull Request #82 · redox-os/rusttype</link>
+			</li>
+			<li>
+				自分の投稿:
+				<ul>
+					<li>
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/99515522800069198">らりお・ザ・何らかの🈗然㊌ソムリエ (mstdn): "Make `gpu_cache` optional by lo48576 · Pull Reque…" - Mastodon</link>
+					</li>
+					<li>
+						<link xl:href="https://twitter.com/lo48576/status/963226505458237440">らりお・ザ・何らかの🈗然㊌㋞㋰㋷㋓ on Twitter: "0.3.1 breaks sem ver ? · Issue #81 · redox-os/rusttype https://t.co/s7RuMs2Tet そんでバージョニングが駄目な感じでミスってて breaking change がリビジョンアップで露呈してた……"</link>
+					</li>
+					<li>
+						<link xl:href="https://twitter.com/lo48576/status/963227441857576961">らりお・ザ・何らかの🈗然㊌㋞㋰㋷㋓ on Twitter: "https://t.co/LjQmejmy6Z ここでちゃんと言及したのに、 Add a simple new `image` example by expenses · Pull Request #62 · redox-os/rusttype https://t.co/dQfVzRYyoa これが私のプルリクのマージで無視される問題に対応されてない……"</link>
+					</li>
+				</ul>
+			</li>
+		</ul>
+
+		<p>
+			rusttype は TTF フォントのラスタライザの Rust 実装。
+		</p>
+		<p>
+			rusttype は OpenGL 等で便利に利用するために、ラスタライズ後の画像のキャッシュを管理するモジュールも持っている。
+			しかし rusttype を純粋にラスタライザとして使うぶんにはこれは不要なものなので、標準で無効化されているべき(必要な場合のみ有効化されるべき)と考えてパッチ #17 を投げた。
+		</p>
+		<p>
+			#82 は、 #17 によって Cargo.toml ファイルに変更が必要になった(が、その変更が行われていなかった)別のプルリクの修正。
+			大したことはしていない。
+			#17 が merge されているのに気付いたのが卒研発表直前だったので、発表が済んでから #82 を投げた。
+		</p>
+	</section>
+</section>
+
+<section xml:id="private-activities">
+	<title>私的活動</title>
+
+	<section xml:id="bought-eroge">
+		<title>ｴﾖｹﾞたくさん買った (2018-02-05)</title>
+
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99472766061577341">
+			<p>
+				戦利品:<br />
+				・まいてつ ビジュアルファンブック<br />
+				・カミカゼ★エクスプローラー！ (初回版)<br />
+				・見上げてごらん、夜空の星を (本編、 FINE DAYS)<br />
+				・この大空に、翼をひろげて COMPLETE BOX (本編、 SNOW PRESENTS 、 FLIGHT DIARY)
+			</p>
+			<mediaobject>
+				<img src="514b79aa4940a440.jpg" alt="" role="blur tiny" xl:href="514b79aa4940a440.jpg" />
+			</mediaobject>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576</link></attribution>,
+				<pubdate><time datetime="2018-02-05T21:32:34+09:00">2018-02-05 21:32:34</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99472766061577341"><uri>https://mastodon.cardina1.red/@lo48576/99472766061577341</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99472794257945886">
+			<p>
+				着々と良くないオタクになっていっているのを感じる……<br />
+				<link xl:href="https://mastodon.cardina1.red/media/media_attachments/files/000/042/261/original/a65daa43fdd32806.jpeg">https://mastodon.cardina1.red/media/HWcWDqLKK7C8gR7sd9c</link>
+			</p>
+			<mediaobject>
+				<img src="a65daa43fdd32806.jpg" alt="" role="blur tiny" xl:href="a65daa43fdd32806.jpg" />
+			</mediaobject>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576</link></attribution>,
+				<pubdate><time datetime="2018-02-05T21:39:45+09:00">2018-02-05 21:39:45</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99472794257945886"><uri>https://mastodon.cardina1.red/@lo48576/99472794257945886</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99472796291041477">
+			<p>
+				まさか自分がｴﾖｹﾞを箱で買って積むオタクになるとは思ってもいなかったよ
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576</link></attribution>,
+				<pubdate><time datetime="2018-02-05T21:40:16+09:00">2018-02-05 21:40:16</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99472796291041477"><uri>https://mastodon.cardina1.red/@lo48576/99472796291041477</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99473033099697741">
+			<p>
+				<link xl:href="https://redmine.cardina1.red/issues/45">https://redmine.cardina1.red/issues/45</link><br />
+				<link xl:href="https://redmine.cardina1.red/issues/46">https://redmine.cardina1.red/issues/46</link><br />
+				<link xl:href="https://redmine.cardina1.red/issues/47">https://redmine.cardina1.red/issues/47</link><br />
+				<link xl:href="https://redmine.cardina1.red/issues/48">https://redmine.cardina1.red/issues/48</link><br />
+				<link xl:href="https://redmine.cardina1.red/issues/49">https://redmine.cardina1.red/issues/49</link><br />
+				<link xl:href="https://redmine.cardina1.red/issues/50">https://redmine.cardina1.red/issues/50</link>
+			</p>
+			<p>
+				俺の Redmine が火を吹くぜ！！！
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576</link></attribution>,
+				<pubdate><time datetime="2018-02-05T22:40:29+09:00">2018-02-05 22:40:29</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99473033099697741"><uri>https://mastodon.cardina1.red/@lo48576/99473033099697741</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99473035503307934">
+			<p>
+				ｴﾖｹﾞの進捗管理のために立てた鯖みたいなところがあるので、本領発揮です
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576</link></attribution>,
+				<pubdate><time datetime="2018-02-05T22:41:06+09:00">2018-02-05 22:41:06</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99473035503307934"><uri>https://mastodon.cardina1.red/@lo48576/99473035503307934</uri></link>
+			</footer>
+		</blockquote>
+
+		<p>
+			<link xl:href="/2018/02/14/monthly-2018-01/#renewed-smart-phone">新しいｽﾏﾋｮ用</link>に大容量の microSD カードを安く調達したかったので、定期券を利用して秋葉原で買い物をしてきた。
+			折角久々のアキバなのだから、ｴﾖｹﾞを漁っていこうというのも自然な話である。
+			結局、またしても動作確認をしていないｴﾖｹﾞを積むことになってしまった。
+			<link xl:href="/2016/06/15/erg-install-battle/#conclusion">過去</link>から学ばないやつめ。
+		</p>
+	</section>
+
+	<section xml:id="ambiwidth-patches">
+		<title>ambiwidth 問題対応用の情報とかを軽くまとめた (2018-02-06)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://gist.github.com/lo48576/194f05f9266761d6925495237594edbc">ambiwidth patches</link>
+			</li>
+		</ul>
+
+		<p>
+			私の使っている環境、 Linux 、 zsh 、 tmux 、 alacritty についての問題とその対処をメモしておいた。
+		</p>
+	</section>
+
+	<section xml:id="started-private-email-server">
+		<title>個人用のメールサーバを立てた (2018-02-19)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://mailu.io/">Mailu — Mailu, Docker based mail server</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/Mailu/Mailu">Mailu/Mailu: Insular email distribution - mail server as Docker images</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/Mailu/Mailu/issues/98">How to use DKIM · Issue #98 · Mailu/Mailu</link>
+			</li>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99552401730660812">らりお・ザ・何らかの🈗然㊌ソムリエ: "SPF レコードを指定したら届いた！" - Mastodon</link>
+			</li>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99552404886909062">らりお・ザ・何らかの🈗然㊌ソムリエ: "というわけでメールサーバ立ちました 🎉" - Mastodon</link>
+			</li>
+		</ul>
+
+		<p>
+			アプリケーションとしては <link xl:href="https://mailu.io/">mailu</link> を用いた。
+			これは docker-compose でメールサーバを立てられるというもので、内部は dovecot 、 postfix 、 rspamd 、 clamav 、 rainloop などといった OSS で構成されているため、データの移行や脱 mailu も簡単のはずである。
+			メールサーバを立てるにあたって、プロプライエタリでないことと、ロックインを回避しデータ移行を容易な状態にしておくことを最優先として考えていたため、 mailu の在り方はまさに私の求めていたものであった。
+		</p>
+	</section>
+
+	<section xml:id="join-osc">
+		<title>OSC 初参加 (2018-02-24)</title>
+
+		<p>
+			初参加。
+		</p>
+	</section>
+
+	<section xml:id="use-systemd-boot">
+		<title>GRUB から systemd-boot へ乗り替えた</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99578929234807697">らりお・ザ・何らかの🈗然㊌ソムリエ: "systemd-boot 使ったらバックライト輝度キーが効かなくなったの解決したい" - Mastodon</link>
+			</li>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99581058664649015">らりお・ザ・何らかの🈗然㊌ソムリエ: "高速起動を無効にしても駄目だったので、 dmesg を比較している……" - Mastodon</link>
+			</li>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99581393934481628">らりお・ザ・何らかの🈗然㊌ソムリエ: "systemd-boot へ完全移行できたっぽい🎉" - Mastodon</link>
+			</li>
+		</ul>
+
+		<p>
+			systemd-boot べんり。
+		</p>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>雑感</title>
+
+	<p>
+		1ヶ月単位で日記書いても遅延するの、もう何をしても駄目という感じがある……
+	</p>
+</section>
+
+</article>

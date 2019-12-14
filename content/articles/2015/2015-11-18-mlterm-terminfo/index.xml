@@ -1,0 +1,437 @@
+---
+created_at: 2015-11-18T21:00:00+09:00
+published_at: 2015-11-18T21:00:00+09:00
+format: article2019
+title: "mltermのterminfoがおかしかった件"
+tags:
+  - linux
+  - terminal
+  - troubleshooting-solved
+kind: article
+article_metadata:
+  image_url: "mlterm-tmux-ok.png"
+  image_base: "relpath"
+  image_alt: "tmux on mlterm で256色出すことに成功した"
+
+excerpt: "mltermでHomeやEndキーがうまく動かなかったため、原因を究明し解決した。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2015-11-18-mlterm-terminfo"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>mltermのterminfoがおかしかった件</title>
+
+<p>
+	解決済。
+</p>
+<p>
+	何度か失敗したので、必要な手順だけ読みたければ<xref linkend="abstract" />と<xref linkend="conclusion" />だけ参照。
+</p>
+
+<section xml:id="abstract">
+	<title>概要</title>
+
+	<p>
+		<link xl:href="https://wiki.archlinuxjp.org/index.php/Zsh#.E3.82.AD.E3.83.BC.E3.83.90.E3.82.A4.E3.83.B3.E3.83.89">Zsh - ArchWiki</link>を参考に以下のようなコードを書いたのだが、これが何故かmltermで動かない。
+	</p>
+	<figure xml:id="figure-sample-bindkey-conf"><programlisting language="bash"><![CDATA[typeset -A key
+key[Home]=${terminfo[khome]}
+key[End]=${terminfo[kend]}
+[[ -n ${key[Home]}        ]] && bindkey "${key[Home]}"      beginning-of-line
+[[ -n ${key[End]}         ]] && bindkey "${key[End]}"       end-of-line]]></programlisting>
+		<caption><filename>~/.zshrc</filename> (抜粋)</caption>
+	</figure>
+	<p>
+		具体的には、<keycap function="home">Home</keycap>キーや<keycap function="end">End</keycap>キーでの挙動がおかしくなる。
+		どうせterminfoが合っていないんだろうと思ったらその通りだった。
+	</p>
+	<p>
+		mltermのソースコードと一緒に配られているterminfoのソースを使おうにも、それも駄目だった。
+	</p>
+</section>
+
+<section xml:id="understand-the-situation">
+	<title>状況把握</title>
+
+	<figure xml:id="figure-get-home-key-seq"><screen role="terminal"><prompt>$ </prompt><userinput>printf '%q' "${terminfo[khome]}"</userinput>
+$'\033'OH
+<prompt>$ </prompt><userinput>printf '%q' "(ここで<keycombo action="seq"><keycombo action="simul"><keycap function="control">Ctrl</keycap><keycap>v</keycap></keycombo> <keycap function="home">Home</keycap></keycombo>)"</userinput>
+$'\033'\[H
+</screen>
+		<caption>terminal</caption>
+	</figure>
+	<p>
+		こんな感じの方法で<keycap function="home">Home</keycap>キーを使ったときのシーケンスと違うのがわかるので、どうにかしよう。
+	</p>
+
+	<note>
+		<title><code>%q</code></title>
+
+		<p>
+			<code language="bash">printf '%q'</code>は、bashやzshでないと使えない。
+		</p>
+	</note>
+</section>
+
+<section xml:id="investigation">
+	<title>調査</title>
+
+	<p>何処からかmlterm-256colorのterminfoが導入されているようなので、それを把握する。</p>
+	<figure xml:id="figure-check-mlterm-256color-terminfo"><screen role="terminal"><prompt>$ </prompt><userinput>infocmp mlterm-256color | head -2</userinput>
+#       Reconstructed via infocmp from file: /usr/share/terminfo/m/mlterm-256color
+mlterm-256color|mlterm 3.0 with xterm 256-colors,
+</screen>
+		<caption>terminal</caption>
+	</figure>
+	<p>
+		ファイルパスがわかったので、どのパッケージがそのファイルを導入したのか調べる。
+		gentoo linux なら<code>qfile</code>コマンドを使う。
+	</p>
+	<figure xml:id="figure-check-ncurses-version"><screen role="terminal"><prompt>$ </prompt><userinput>qfile /usr/share/terminfo/m/mlterm-256color</userinput>
+sys-libs/ncurses (/usr/share/terminfo/m/mlterm-256color)
+<prompt>$ </prompt><userinput>ncurses6-config --version</userinput>
+6.0.20150808
+</screen>
+		<caption>terminal</caption>
+	</figure>
+	<p>
+		ncurses-6.0 のファイルが古いのだということがわかった。
+	</p>
+
+	<tip>
+		<title><code>qfile</code></title>
+
+		<p>
+			<code>qfile</code>コマンドは、gentooでは<code>app-portage/portage-utils</code>パッケージにある。
+		</p>
+	</tip>
+
+	<p>
+		たぶん昔ncursesに追加されてから更新されていなかったのだろう。
+	</p>
+	<p>
+		mltermのバージョンを見てみる。
+	</p>
+	<figure xml:id="figure-check-mlterm-version">
+		<screen role="terminal"><prompt>$ </prompt><userinput>mlterm --version</userinput>
+mlterm version 3.5.0
+</screen>
+		<caption>terminal</caption>
+	</figure>
+	<p>
+		ソースコードを落とすなりしてChangeLogで<code>sequence</code>や<code>\x1b</code>といったパターンで検索し確認すると、2012-09-04に以下のような変更があった。
+	</p>
+	<figure xml:id="figure-mlterm-changelog">
+		<literallayout class="monospaced"><![CDATA[- Following key sequences are changed.
+  XK_BackSpace: \x7f -> \x08
+  XK_Home:   \x1bOH -> \x1b[H
+  XK_End:    \x1bOF -> \x1b[F
+  XK_F1:     \x1b[11~ -> \x1bOP
+  XK_F2:     \x1b[12~ -> \x1bOQ
+  XK_F3:     \x1b[13~ -> \x1bOR
+	XK_F4:     \x1b[14~ -> \x1bOS]]></literallayout>
+		<caption><filename>ChangeLog</filename> (抜粋)</caption>
+	</figure>
+	<p>
+		これに追従できていなかったのだろう。
+	</p>
+</section>
+
+<section xml:id="cope">
+	<title>対処</title>
+
+	<section xml:id="upstream-file-is-outdated">
+		<title>本家ファイルからして古かった</title>
+
+		<p>
+			mlterm本家のterminfoをユーザーローカルで導入すればいいと、この時は思っていたのだ。
+		</p>
+		<p>
+			現時点(2015-11-18)で最新の、mlterm-3.6.0のソースを落とす。
+			ChangeLogを確認したところ、前述のもの以降でこれといったterminfoの変更は無さそうなので、バージョン違いは気にせず新しいやつを使ってしまうことにしよう。
+		</p>
+		<p>
+			展開したソースの<filename>doc/term/mlterm.ti</filename>がterminfoのソースだ。
+		</p>
+		<p>
+			まあ念のためと思って中身を確認するじゃん？
+		</p>
+		<figure xml:id="figure-mlterm-mi-old"><screen role="terminal"><prompt>$ </prompt><userinput>grep khome doc/term/mlterm.ti</userinput>
+        kfnd=\E[1~, khome=\EOH, kich1=\E[2~, kmous=\E[M, knp=\E[6~, kpp=\E[5~,
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			なんかもう、ダメダメだ。
+			ncurses、お前は悪くなかったんや……
+		</p>
+
+		<note>
+			<title>Experimental</title>
+
+			<p>
+				いや、実は<filename>doc/term/README.term</filename>に以下のように書いてある。
+			</p>
+			<blockquote>
+				Exprinemtal terminfo/termcap data for mlterm
+			</blockquote>
+			<p>
+				Experimentalだから、おかしくても仕方がないよね！！！
+			</p>
+		</note>
+	</section>
+
+	<section xml:id="edit-manually">
+		<title>自力で編集</title>
+
+		<p>
+			仕方ないので、これをベースに自分でシーケンスの変更を適用していく。
+		</p>
+		<p>
+			以下<filename>mlterm-3.6.0.ti</filename>は、mltermの<filename>doc/term/mlterm.ti</filename>をどこかにコピーしてきたものとする。
+		</p>
+		<figure xml:id="figure-edit-mlterm-ti">
+			<screen role="terminal"><prompt>$ </prompt><userinput>sed \
+    -e '1s/mlterm\|/mlterm|mlterm-256color|/' \
+    -e 's/khome=\\EOH,/khome=\\E[H,/' \
+    -e 's/kend=\\EOF,/kend=\\E[F,/' \
+    -e 's/kf1=\\E\[11~,/kf1=\\EOP,/' \
+    -e 's/kf2=\\E\[12~,/kf2=\\EOQ,/' \
+    -e 's/kf3=\\E\[13~,/kf3=\\EOR,/' \
+    -e 's/kf4=\\E\[14~,/kf4=\\EOS,/' \
+    -i mlterm-3.6.0.ti</userinput>
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			どうにも泥臭くて好きではないが、こんなの実行するのは一度きりなのでこれでいいだろう。
+		</p>
+		<p>
+			適用した変更は2種類。
+			シーケンスの変更の反映と、<code>mlterm-256color</code>への対応だ。
+		</p>
+		<p>
+			<code>mlterm-256color</code>への対応であるが、公式のソースが<code>mlterm</code>向けに記述されているため、<code>TERM</code>環境変数が<code>mlterm-256color</code>の状態でもこれを適用してほしいのであれば、その指定も追加する必要がある。
+			その変更が<code>-e '1s/mlterm\|/mlterm|mlterm-256color|/'</code>だ。
+		</p>
+		<p>
+			<code>sed</code>の<code>-i</code>オプションは、入力ファイルをそのまま置換結果で上書きしてくれるので、これで<filename>mlterm-3.6.0.ti</filename>は正しくmltermのシーケンスを解釈するterminfoのソースファイルとなった。
+		</p>
+		<p>
+			これをコンパイルし、<filename>~/.terminfo/m/mlterm-256color</filename>というファイルとして置いてやればよい。
+		</p>
+	</section>
+
+	<section xml:id="compile-terminfo-source">
+		<title>terminfoのソースのコンパイル</title>
+
+		<p>
+			これといって特筆することもない。
+			本当にコンパイルするだけだ。
+		</p>
+		<figure xml:id="figure-execute-tic">
+			<screen role="terminal"><prompt>$ </prompt><userinput>ls ~/.terminfo</userinput>
+ls: cannot access /home/larry/.terminfo: No such file or directory
+<prompt>$ </prompt><userinput>tic mlterm-3.6.0.ti</userinput>
+<prompt>$ </prompt><userinput>ls -l ~/.terminfo/m/</userinput>
+total 8
+-rw-r--r-- 1 larry larry 1990 2015-11-18 13:24 mlterm
+lrwxrwxrwx 1 larry larry    6 2015-11-18 13:24 mlterm-256color -> mlterm
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			配置先のディレクトリがなくても<code>tic</code>は勝手にディレクトリを作ってくれるので、
+			頭を空っぽにして実行すればいい。
+		</p>
+
+		<warning>
+			<title><code>tic</code>の実行ユーザ</title>
+
+			<p>
+				root権限で<code>tic</code>を実行すると、<filename class="directory">/usr/share/terminfo</filename>等のシステムデフォルトのディレクトリへファイルを生成してしまうかもしれない。
+				この挙動を望まないのであれば、<code>TERMINFO</code>環境変数か<code>-o</code>オプションで<filename class="directory">~/.terminfo</filename>等のディレクトリを指定すること。
+			</p>
+		</warning>
+		<p>
+			これにて問題は解決した...と思うじゃん？
+		</p>
+	</section>
+</section>
+
+<section xml:id="solved">
+	<title>解決</title>
+
+	<p>
+		残念ながらこの状態だと、<code>tmux</code>が256色出してくれない。
+	</p>
+	<figure xml:id="figure-tmux-working-captures" role="independent-block grid-row">
+		<figure xml:id="figure-tmux-expected-colors" role="col-xs-12 col-sm-6">
+			<mediaobject>
+				<img src="mlterm-tmux-ok.png" alt="256色が正しく表示されることが期待されていた。" />
+			</mediaobject>
+			<caption>期待していた結果</caption>
+		</figure>
+		<figure xml:id="figure-tmux-actual-colors-by-official-terminfo" role="col-xs-12 col-sm-6">
+			<mediaobject>
+				<img src="mlterm-tmux-bad.png" alt="実際には、256色どころか16色さえ正しく表示されていない。" />
+			</mediaobject>
+			<caption>mlterm公式のterminfoをベースにした結果</caption>
+		</figure>
+	</figure>
+	<p>
+		つらい。
+	</p>
+	<p>
+		原因を探ったところ、<code>setab</code>と<code>setaf</code>の指定が問題であることがわかった。
+	</p>
+
+	<figure xml:id="figure-problematic-part-of-mlterm-official-terminfo">
+		<literallayout class="monospaced"><![CDATA[	setab=\E[4%p1%dm,
+	setaf=\E[3%p1%dm,]]></literallayout>
+		<caption>tmuxが256色出さないterminfo (mlterm-3.6.0 公式)</caption>
+	</figure>
+	<figure xml:id="figure-problematic-part-of-mlterm-terminfo-after-fix">
+		<literallayout class="monospaced"><![CDATA[	setab=\E[%?%p1%{8}%&lt;%t4%p1%d%e%p1%{16}%&lt;%t10%p1%{8}%-%d%e48;5;%p1%d%;m,
+	setaf=\E[%?%p1%{8}%&lt;%t3%p1%d%e%p1%{16}%&lt;%t9%p1%{8}%-%d%e38;5;%p1%d%;m,]]></literallayout>
+		<caption>tmuxが256色出すterminfo (ncurses-6.0 同梱)</caption>
+	</figure>
+
+	<tip>
+		<title>究明の方法</title>
+
+		<p>
+			<code>vimdiff &lt;(infocmp -A /usr/share/terminfo mlterm-256color | sed -e 's/, /,\n\t/g') &lt;(infocmp mlterm-256color | sed -e 's/, /,\n\t/g')</code>して、異なるそれぞれの項目をマージしてコンパイルし、確認していく。
+		</p>
+		<p>
+			<code>&lt;(command)</code>はbashやzshでないと使えないので注意。
+		</p>
+	</tip>
+
+	<p>
+		結局、ncursesの方が正しかったらしい。
+		<link xl:href="http://invisible-island.net/ncurses/terminfo.ti.html#tic-mlterm">terminfo.src (colored) for NCURSES</link>を見ると、<code>mlterm3</code>の項目のコメントに以下のようにあった。
+	</p>
+	<figure xml:id="figure-ncurses-mlterm-terminfo-comment">
+		<literallayout class="monospaced"><![CDATA[# Tested mlterm 3.2.2:
+# mlterm 3.x has made changes, but they are not reflected in the included
+# mlterm.ti; this entry is based on testing with tack and vttest -TD]]></literallayout>
+		<caption><link xl:href="http://invisible-island.net/ncurses/terminfo.ti.html#tic-mlterm">terminfo.src</link>のコメント (抜粋)</caption>
+	</figure>
+	<p>
+		そういうわけで、折角一部キー以外問題ないものがあるのだから、それを使おう。
+	</p>
+	<figure xml:id="figure-fixed-mlterm-terminfo-simple">
+		<literallayout class="monospaced"><![CDATA[mlterm|mlterm-256color|multi lingual terminal emulator,
+	khome=\E[H,
+	kend=\E[F,
+	kf1=\EOP,
+	kf2=\EOQ,
+	kf3=\EOR,
+	kf4=\EOS,
+	use=mlterm-256color,]]></literallayout>
+		<caption>mlterm用terminfoソース完成版(1)</caption>
+	</figure>
+	<p>
+		<code>use=</code>で他のterminfoを参照できる。
+		ここではncursesが入れてくれた<code>mlterm-256color</code>を参照する。
+		循環参照っぽさがあるが、とりあえず動いたので良しとしよう。
+		心配なら以下のようにしてやれば同じ結果が得られるだろう。
+	</p>
+	<figure xml:id="figure-edit-mlterm-terminfo">
+		<screen role="terminal"><prompt>$ </prompt><userinput>infocmp -A /usr/share/terminfo mlterm-256color \
+    | sed \
+        -e 's/khome=\\EOH,/khome=\\E[H,/' \
+        -e 's/kend=\\EOF,/kend=\\E[F,/' \
+        -e 's/kf1=\\E\[11~,/kf1=\\EOP,/' \
+        -e 's/kf2=\\E\[12~,/kf2=\\EOQ,/' \
+        -e 's/kf3=\\E\[13~,/kf3=\\EOR,/' \
+        -e 's/kf4=\\E\[14~,/kf4=\\EOS,/' \
+	&gt;mlterm-256color.ti</userinput>
+<prompt>$ </prompt><userinput>tic mlterm-256color.ti</userinput>
+</screen>
+		<caption>mlterm用terminfoソース(2)の作り方</caption>
+	</figure>
+	<p>
+		これでやっと意図した結果が得られた(何を隠そう、先の「期待される結果」の画像はこのファイルを使ったものだ)。
+	</p>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+
+	<section xml:id="conclusion--problem">
+		<title>問題</title>
+
+		<ul>
+			<li>
+				<code>ncurses6</code>に含まれている<code>mlterm-256color</code>のterminfoは古く、一部キーが正常に認識されない原因になる。
+			</li>
+			<li>
+				かといって<code>mlterm</code>のソースコードに含まれているものを使おうにも、これもまた古く、256色が正しく扱えないことがある。
+			</li>
+			<li>
+				よって、<code>ncurses6</code>の<code>mlterm-256color</code>のファイルをベースに、一部キーのシーケンスを変更し、これを優先的に使うことにした。
+				<ul>
+					<li>
+						古いバージョンから変更されたシーケンスは、<code>mlterm</code>のChangeLogに記録されているため追跡できた。
+					</li>
+				</ul>
+			</li>
+		</ul>
+	</section>
+
+	<section xml:id="conclusion--operations">
+		<title>手順</title>
+
+		<p>
+			<code>mlterm-256color</code>のterminfoのファイルがインストールされているか確認する。
+			このファイルが<code>ncurses</code>によるものであるのが理想的だ。
+		</p>
+		<figure xml:id="figure--conclusion--check-ncurses-version">
+			<screen role="terminal"><prompt>$ </prompt><userinput>ncurses6-config --version</userinput>
+6.0.20150808
+<prompt>$ </prompt><userinput>infocmp -D</userinput>
+/home/larry/.terminfo
+/etc/terminfo
+/usr/share/terminfo
+<prompt>$ </prompt><userinput>ls /usr/share/terminfo/m/mlterm-256color</userinput>
+/usr/share/terminfo/m/mlterm-256color
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			ファイルがあったら、これを以下のコマンドで編集する。
+		</p>
+		<figure xml:id="figure--conclusion--edit-mlterm-terminfo">
+			<screen role="terminal"><prompt>$ </prompt><userinput>infocmp -A /usr/share/terminfo mlterm-256color \
+  | sed \
+    -e 's/khome=\\EOH,/khome=\\E[H,/' \
+    -e 's/kend=\\EOF,/kend=\\E[F,/' \
+    -e 's/kf1=\\E\[11~,/kf1=\\EOP,/' \
+    -e 's/kf2=\\E\[12~,/kf2=\\EOQ,/' \
+    -e 's/kf3=\\E\[13~,/kf3=\\EOR,/' \
+    -e 's/kf4=\\E\[14~,/kf4=\\EOS,/' \
+  &gt;mlterm-256color.ti</userinput>
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			このファイルをコンパイルし、インストールする。
+			このときroot権限だとシステムディレクトリに入れてしまう可能性があるので注意。
+		</p>
+		<figure xml:id="figure--conclusion--execute-tic">
+			<screen role="terminal"><prompt>$ </prompt><userinput>tic mlterm-256color.ti</userinput>
+</screen>
+			<caption>terminal</caption>
+		</figure>
+		<p>
+			これでおしまい。
+		</p>
+	</section>
+</section>
+</article>

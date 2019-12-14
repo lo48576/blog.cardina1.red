@@ -1,0 +1,47 @@
+- target_tag = Tags.from_item(@item)
+- render '/page-base.*'
+  == yield
+  section
+    h1 関連情報
+    section
+      h2 関連タグ
+      section
+        h3 先祖
+        - if parents = tags.parents(target_tag)
+          ul
+            - parents.sort.each do |parent; link_item|
+              - link_item = tags.item(parent)
+              li[style='font-weight: bold']
+                == link_to h(link_item[:title]), link_item
+            - tags.indirect_ancestors(target_tag).sort.each do |ancestor; link_item|
+              - link_item = tags.item(ancestor)
+              li
+                == link_to h(ancestor), tags.item(ancestor)
+      section
+        h3 子孫
+        - if children = tags.children(target_tag)
+          ul
+            - children.sort.each do |child; link_item|
+              - link_item = tags.item(child)
+              li[style='font-weight: bold']
+                == link_to h(link_item[:title]), link_item
+            - tags.indirect_descendants(target_tag).sort.each do |descendant; link_item|
+              - link_item = tags.item(descendant)
+              li
+                == link_to h(link_item[:title]), link_item
+  section
+    h1 関連情報
+    section
+      h2 直接タグ付けされた記事
+      - target_items = tags.articles_direct(target_tag)
+      - if target_items.any?
+        == render '/part/item-list.*', target_items: target_items.sort_by{|e| e[:created_at]}.reverse, header_level: 3
+      - else
+        p There's no articles directly tagged by #{h target_tag}.
+    section
+      h2 間接的にタグ付けされた記事
+      - target_items = tags.articles_indirect(target_tag)
+      - if target_items.any?
+        == render '/part/item-list.*', target_items: target_items.sort_by{|e| e[:created_at]}.reverse, header_level: 3
+      - else
+        p There's no articles indirectly tagged by #{h target_tag}.

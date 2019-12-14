@@ -1,0 +1,23 @@
+---
+title: "shell script"
+kind: tag
+imply:
+  - programming
+
+excerpt: "シェルスクリプトの話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-prog-shell-script"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>shell script</title>
+
+<p>
+	シェルスクリプトの話題。
+</p>
+
+</article>

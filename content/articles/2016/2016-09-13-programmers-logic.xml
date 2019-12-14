@@ -1,0 +1,126 @@
+---
+created_at: 2016-09-13T10:52:56+0900
+published_at: 2016-09-13T10:52:56+0900
+updated_at: 2017-07-05T22:16:52+0900
+format: article2019
+title: "プログラマの論理"
+tags:
+  - programming
+  - ordinary-life
+  - tsurapoyo
+kind: article
+
+excerpt: "プログラマは洗濯物を入れないことがある。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2016-09-13-programmers-logic"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>プログラマの論理</title>
+
+<section xml:id="event">
+	<title>事象</title>
+	<p>
+		先週の出来事。
+	</p>
+
+	<blockquote>
+		<literallayout class="normal">私「今日学校行くことになるかもしれん」
+母「出るなら洗濯物入れてって」
+
+私の脳内: <code>self.set_hook(BEFORE, 外出, function(){self.洗濯物を入れる()});</code>
+
+私「んー」
+
+〜夜〜
+
+母「なんで洗濯物入れなかったの！」
+私「外に出なかったから……」</literallayout>
+	</blockquote>
+
+	<p>
+		理不尽だ。
+		外に出なかった場合の動作は未規定なので実装依存のはずである。
+	</p>
+</section>
+
+<section xml:id="their-claim">
+	<title>母に味方する主張</title>
+	<p>
+		最適化で命令を単純化すべきである。
+		すなわち、条件分岐をなくし、常に一定のタイミングで洗濯物を入れるよう動作すべきである。
+	</p>
+</section>
+
+<section xml:id="our-claim">
+	<title>私に味方する主張</title>
+	<p>
+		最適化でパフォーマンスを向上すべきである。
+		すなわち、可能な場合常に洗濯物を入れないべきである。
+	</p>
+</section>
+
+<section xml:id="lesson">
+	<title>教訓</title>
+	<p>
+		実装依存の挙動は怖い。
+	</p>
+</section>
+
+<section xml:id="postscript1">
+	<title>追記 (2017-07-05)</title>
+	<blockquote cite="https://twitter.com/i/web/status/882588192846651392">
+		<p>
+			このときの「ならば」は実行条件ではなく「指示を出した理由」だ。
+			外へ出るという予定を聞いたから指示を出しておくという意味。
+			つまり、指示をした時点で意味を成しているので実行フェイズでは消去して考えるということで矛盾はない。
+		</p>
+		<blockquote cite="https://twitter.com/i/web/status/775517223502819328">
+			<p>
+				プログラマの論理 - 何とは言わない天然水飲みたさ <link xl:href="https://blog.cardina1.red/2016/09/13/programmers-logic/">https://blog.cardina1.red/2016/09/13/programmers-logic/</link><br />
+				書いた
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://twitter.com/intent/user?user_id=2375406199">@L16777216@twitter.com</link></attribution>,
+				<pubdate><time datetime="2016-05-08T00:28:00.751+0900">2016-05-08 00:28:00</time></pubdate>,
+				<link xl:href="https://twitter.com/i/web/status/775517223502819328">Twitter</link>
+			</footer>
+		</blockquote>
+		<footer>
+			&#x2014;
+			<attribution><link xl:href="https://twitter.com/intent/user?user_id=6137682">@SaitoAtsushi@twitter.com</link></attribution>,
+			<pubdate><time datetime="2017-07-05T22:13:17.527+0900">2017-07-05 22:13:17</time></pubdate>,
+			<link xl:href="https://twitter.com/i/web/status/882588192846651392">Twitter</link>
+		</footer>
+	</blockquote>
+	<p>
+		なるほど。
+	</p>
+</section>
+
+<section xml:id="references">
+	<title>参考資料</title>
+	<ul>
+		<li>
+			<p>
+				<link xl:href="http://dailynewsagency.com/2011/02/16/programmer_joke/">「プログラマにお使いを頼んだら……」ジョークが海外の掲示板で人気 - DNA </link>
+			</p>
+			<blockquote cite="https://www.reddit.com/r/funny/comments/fklb1/a_wife_asks_her_husband_a_software_engineer/">
+				<literallayout class="normal">“Could you please go shopping for me and buy one carton of milk, and if they have eggs, get 6!”
+A short time later the husband comes back with 6 cartons of milk.
+The wife asks him, “Why the hell did you buy 6 cartons of milk?”
+He replied, “They had eggs.”</literallayout>
+				<footer>
+					&#x2014;
+					<link xl:href="https://www.reddit.com/r/funny/comments/fklb1/a_wife_asks_her_husband_a_software_engineer/">A wife asks her husband, a software engineer... - funny</link>
+				</footer>
+			</blockquote>
+		</li>
+	</ul>
+</section>
+</article>

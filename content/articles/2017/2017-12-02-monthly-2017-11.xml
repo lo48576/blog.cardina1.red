@@ -1,0 +1,521 @@
+---
+created_at: 2017-12-02T01:31:56+0900
+published_at: 2017-12-02T01:31:56+0900
+format: article2019
+title: "Monthly report 2017-11"
+tags:
+  - diary
+kind: article
+
+excerpt: "2017年 11月 まとめ"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2017-11-30-monthly-2017-11"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Monthly report 2017-11</title>
+<p>
+	2017-11 の日記。
+</p>
+
+<section xml:id="news">
+	<title>ニュース・知ったこと</title>
+
+	<section xml:id="mastodon-meta-forum-ja">
+		<title>Mastodon日本語メタフォーラム 開設 (2017-11-13)</title>
+
+		<ul>
+			<li>
+				<link xl:href="https://discourse.mstdn.jp/">Mastodon日本語メタフォーラム</link>
+			</li>
+			<li>
+				<link xl:href="https://edge.mstdn.jp/@metaforum_ja">Mastodon日本語メタフォーラム - mstdn.jp on The Edge</link>
+				(新規トピック通知 bot)
+			</li>
+			<li>
+				<blockquote cite="https://mstdn.jp/@nullkal/98996047020704862">
+					<p>
+						Mastodonの開発・運用に関する話題を日本語でするためのフォーラムを作りました<br />
+						<link xl:href="https://discourse.mstdn.jp/">https://discourse.mstdn.jp/</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mstdn.jp/@nullkal">@nullkal@mstdn.jp</link></attribution>,
+						<pubdate><time datetime="2017-11-13T16:56:39+0900">2017-11-13 16:56:39</time></pubdate>,
+						<link xl:href="https://mstdn.jp/@nullkal/98996047020704862"><uri>https://mstdn.jp/@nullkal/98996047020704862</uri></link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+		<p>
+			日本の超大手インスタンスである <link xl:href="https://mstdn.jp/">mstdn.jp</link> の管理人、ぬるかる氏が開設した日本語フォーラム。
+			疑問とか要望っぽいのはあるけど issue 立てるほどでも……とか、宣伝・自慢したいとか、そんな感じの話ができる。
+		</p>
+	</section>
+
+	<section xml:id="firefox-quantum-release">
+		<title>Firefox Quantum リリース (2017-11-14)</title>
+		<ul>
+			<li>
+				<link xl:href="https://www.mozilla.org/ja/firefox/">Mac、PC、Linux 向け新高速ブラウザー | Firefox</link>
+			</li>
+			<li>
+				<blockquote cite="https://twitter.com/i/web/status/930540926786666497">
+					<p>
+						🔥 新エンジン搭載で爆速化<br />
+						📉 Chrome より 30% 省メモリー<br />
+						🎨 洗練されたデザイン<br />
+						🕶 強力プライベートブラウジング<br />
+						⚙️ 豊富な拡張機能とテーマ<br />
+						📱 スマホやタブレットと同期<br />
+						🚪 ブラウザー乗り換えも簡単<br />
+						💕 開発元は非営利法人
+					</p>
+					<p>
+						Firefox Quantum、誕生。<br />
+						<link xl:href="https://www.mozilla.org/ja/firefox">https://www.mozilla.org/ja/firefox</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://twitter.com/intent/user?user_id=124439359">@mozillajp@twitter.com</link></attribution>,
+						<pubdate><time datetime="2017-11-15T06:00:20.217+0900">2017-11-15 06:00:20</time></pubdate>,
+						<link xl:href="https://twitter.com/i/web/status/930540926786666497">Twitter</link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+		<p>
+			Rust のコード等も組み込まれている、 <link xl:href="https://hacks.mozilla.org/2017/08/inside-a-super-fast-css-engine-quantum-css-aka-stylo/">Quantum CSS (Stylo)</link> が有効化された安定リリース。
+			内部だけでなく、 UI 等も刷新された。
+		</p>
+		<p>
+			私は Firefox beta を使っているので数週間前から恩恵に与っていた。
+			内部エンジンが変わったから何なんだという感想を持つ人もあるかもしれないが、ユーザにとって(わかりやすく)直接的に嬉しいのは、マルチプロセス対応とかだろうか。
+		</p>
+	</section>
+
+	<section xml:id="miagete-english">
+		<title>『見上げてごらん、夜空の星を』 英語版 発表 (2017-11-17)</title>
+		<ul>
+			<li>
+				<link xl:href="http://moenovel.com/a-sky-full-of-stars">A Sky Full of Stars | MoeNovel</link>
+			</li>
+			<li>
+				<blockquote cite="https://twitter.com/i/web/status/931458642418774016">
+					<p>
+						We are excited to announce A Sky Full Of Stars is coming in December!
+						The starry sky spreads far and wide overhead...
+						A story full of love, comedy, &amp; excitement follows our protagonist &amp; his stargazing friends as they grow together.<br />
+						<link xl:href="http://moenovel.com/a-sky-full-of-stars">http://moenovel.com/a-sky-full-of-stars</link><br />
+						<link xl:href="http://store.steampowered.com/app/745960/A_Sky_Full_of_Stars">http://store.steampowered.com/app/745960/A_Sky_Full_of_Stars</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://twitter.com/intent/user?user_id=1424843924">@Moenovel@twitter.com</link></attribution>,
+						<pubdate><time datetime="2017-11-17T18:47:00.674+0900">2017-11-17 18:47:00</time></pubdate>,
+						<link xl:href="https://twitter.com/i/web/status/931458642418774016">Twitter</link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://twitter.com/i/web/status/931549597947846657">
+					<p>
+						【みあげて】ころげてに続き『見上げてごらん、夜空の星を』が世界へ羽ばたきます！！ 平たく言うとスチーム移植されます。自分の書いたものを海外の人に遊んでいただけるなんて数年前は想像もしてなかったので、驚くやら嬉しいやら。　<link xl:href="https://twitter.com/hashtag/%E5%A4%9C%E7%A9%BA%E3%81%AE%E6%98%9F%E3%82%92">#夜空の星を</link><br />
+						<link xl:href="http://moenovel.com/a-sky-full-of-stars">http://moenovel.com/a-sky-full-of-stars</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://twitter.com/intent/user?user_id=asta_konno">@asta_konno@twitter.com</link></attribution>,
+						<pubdate><time datetime="2017-11-18T00:48:26.162+0900">2017-11-18 00:48:26</time></pubdate>,
+						<link xl:href="https://twitter.com/i/web/status/931549597947846657">Twitter</link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+		<p>
+			<link xl:href="https://www.youtube.com/watch?v=zqGpHOLGIlo">OP曲</link>とか<link xl:href="https://www.youtube.com/watch?v=dzQNWtJD8aw">テーマ曲</link>とか非常に好きなので気になっていたゲーム。
+			翻訳されるくらいなんだから面白いのだろう。
+			<link xl:href="https://redmine.cardina1.red/issues/39">そのうちやってみたい</link>。
+		</p>
+	</section>
+
+	<section xml:id="monobeno-chinese">
+		<title>『ものべの -happy end-』 中国語版 発表 (2017-11-17)</title>
+		<ul>
+			<li>
+				<link xl:href="http://hikarifield.co.jp/mnbn/">茂伸奇谈-happy end- 中文官方网站</link>
+			</li>
+			<li>
+				<blockquote cite="https://twitter.com/i/web/status/931502374773964800">
+					<p>
+						突然ですが「 ものべの-happy end-」の中国語版が発表されました！　HIKARI FIELD様より、簡体字・繁体字で販売されます！　中国語だと「茂伸奇谈」となるようです。公式サイトには翻訳ムービーもありますので、是非ご確認下さい！！　<link xl:href="http://hikarifield.co.jp/mnbn/">http://hikarifield.co.jp/mnbn/</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://twitter.com/intent/user?user_id=826149872701104128">@news_lose@twitter.com</link></attribution>,
+						<pubdate><time datetime="2017-11-17T21:40:47.280+0900">2017-11-17 21:40:47</time></pubdate>,
+						<link xl:href="https://twitter.com/i/web/status/931502374773964800">Twitter</link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+		<p>
+			すごい。めでたい。
+			しかし英語じゃなくて中国語か……
+			もっとも、英語で出たところであのシナリオを英語でやられて私が理解できるとも思えないが。
+		</p>
+		<p>
+			はやくクリアして『まいてつ』やりたい……(最近ｴﾖｹﾞ自体起動してない顔)
+		</p>
+	</section>
+
+	<section xml:id="rust-1-22-release">
+		<title>Rust 1.22 (と 1.22.1) リリース (2017-11-22)</title>
+		<ul>
+			<li>
+				<link xl:href="https://blog.rust-lang.org/2017/11/22/Rust-1.22.html">Announcing Rust 1.22 (and 1.22.1) - The Rust Programming Language Blog</link>
+			</li>
+			<li>
+				<link xl:href="https://www.rust-lang.org/ja-JP/">プログラミング言語 Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/rust-lang/rust/">rust-lang/rust: A safe, concurrent, practical language.</link>
+			</li>
+		</ul>
+		<p>
+			<code>Option</code> に対して <code>?</code> 演算子を使えるようになったのが目玉機能かな。
+		</p>
+		<p>
+			このリリースとは直接関係ないが、 <link xl:href="https://github.com/rust-lang-nursery/rls">rls-preview</link> が rustup からインストールできるようになったりとか、 <link xl:href="https://www.hellorust.com/news/native-wasm-target.html">WebAssembly へのコンパイルができるようになった</link>りとか、最近いろいろ面白い。
+			これからの進歩も楽しみだ。
+		</p>
+	</section>
+
+	<section xml:id="diesel-0-99-release">
+		<title>diesel crate の v0.99.0 がリリース (2017-11-29)</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/diesel-rs/diesel">diesel-rs/diesel: A safe, extensible ORM and Query Builder for Rust</link>
+			</li>
+			<li>
+				<blockquote cite="https://twitter.com/i/web/status/935663851936219138">
+					<p>
+						Diesel 0.99.0 has been released! (It's like 1.0 except that it's not)<br />
+						<link xl:href="https://github.com/diesel-rs/diesel/releases/tag/v0.99.0">https://github.com/diesel-rs/diesel/releases/tag/v0.99.0</link>
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://twitter.com/intent/user?user_id=4888493863">@dieselframework@twitter.com</link></attribution>,
+						<pubdate><time datetime="2017-11-29T09:17:00.752+0900">2017-11-29 09:17:00</time></pubdate>,
+						<link xl:href="https://twitter.com/i/web/status/935663851936219138">Twitter</link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/99088588052348458">
+					<p>
+						Release v0.99.0 (It's basically 1.0 except it's not) · diesel-rs/diesel<br />
+						<link xl:href="https://github.com/diesel-rs/diesel/releases/tag/v0.99.0">https://github.com/diesel-rs/diesel/releases/tag/v0.99.0</link>
+					</p>
+					<p>
+						いつぞやの Linux みたいなバージョニングだなwww
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-30T01:11:40+0900">2017-11-30 01:11:40</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/99088588052348458"><uri>https://mastodon.cardina1.red/@lo48576/99088588052348458</uri></link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/99088599770296782">
+					<p>
+						Linux - Wikipedia<br />
+						<link xl:href="https://ja.wikipedia.org/wiki/Linux#.E3.82.AB.E3.83.BC.E3.83.8D.E3.83.AB.E9.96.8B.E7.99.BA.E3.81.AE.E9.81.8D.E6.AD.B4">https://ja.wikipedia.org/wiki/Linux#.E3.82.AB.E3.83.BC.E3.83.8D.E3.83.AB.E9.96.8B.E7.99.BA.E3.81.AE.E9.81.8D.E6.AD.B4</link><br />
+						Index of /Linux.old/kernel/<br />
+						<link xl:href="http://www.oldlinux.org/Linux.old/kernel/">http://www.oldlinux.org/Linux.old/kernel/</link>
+					</p>
+					<p>
+						Linus が「もう95%完成したやろwww」っていきなり 0.95 に上げたら、その後大変苦労したとかいう話を思い出した
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-30T01:14:02+0900">2017-11-30 01:14:02</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/99088599770296782"><uri>https://mastodon.cardina1.red/@lo48576/99088599770296782</uri></link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+	</section>
+</section>
+
+<section xml:id="public-activities">
+	<title>ﾊﾟﾌﾞﾘｯｸ活動</title>
+
+	<section xml:id="pull-req-lazy-init">
+		<title>lazy-init crate へプルリク出した(マージされた)</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/khuey/lazy-init">khuey/lazy-init</link>
+			</li>
+			<li>
+				<link xl:href="https://crates.io/crates/lazy-init">lazy-init - Cargo: packages for Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/khuey/lazy-init/pull/1">Some refactoring by lo48576 · Pull Request #1 · khuey/lazy-init</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/khuey/lazy-init/pull/2">Add `Default` impls by lo48576 · Pull Request #2 · khuey/lazy-init</link>
+			</li>
+			<li>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/98973726417849141">
+					<p>
+						Some refactoring by lo48576 · Pull Request #1 · khuey/lazy-init<br />
+						<link xl:href="https://github.com/khuey/lazy-init/pull/1">https://github.com/khuey/lazy-init/pull/1</link><br />
+						Add `Default` impls by lo48576 · Pull Request #2 · khuey/lazy-init<br />
+						<link xl:href="https://github.com/khuey/lazy-init/pull/2">https://github.com/khuey/lazy-init/pull/2</link>
+					</p>
+					<p>
+						クッソショボいプルリクを発動した
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-09T18:20:14+0900">2017-11-09 18:20:14</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/98973726417849141"><uri>https://mastodon.cardina1.red/@lo48576/98973726417849141</uri></link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/98973728116255828">
+					<p>
+						`Default` の実装が本命で、リファクタリングはオマケ
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-09T18:20:40+0900">2017-11-09 18:20:40</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/98973728116255828"><uri>https://mastodon.cardina1.red/@lo48576/98973728116255828</uri></link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/98984987563930163">
+					<p>
+						両方とも merge された 🎉
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-11T18:04:05+0900">2017-11-11 18:04:05</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/98984987563930163"><uri>https://mastodon.cardina1.red/@lo48576/98984987563930163</uri></link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+
+		<p>
+			やったね。
+		</p>
+		<p>
+			lazy-init は、スレッドセーフな遅延初期化を実現するライブラリ。
+			静的サイトジェネレータで「スレッド間で共有されうるファイルコンテント(ただし実際使うかはわからないので読み込みは遅延させたい)」みたいなオブジェクトが欲しかったところ、これを見付けた。
+		</p>
+		<p>
+			似たようなものとして <link xl:href="https://doc.rust-lang.org/std/sync/struct.Once.html"><code>std::sync::Once</code></link> が標準ライブラリにもあるが、これは初期化済フラグがグローバルなものなので、動的にポコポコ生み出すオブジェクトには使えない。
+			シングルトンを作りたいとかハードウェアを初期化したりといった用途で使うものだ。
+		</p>
+	</section>
+
+	<section xml:id="pull-req-coco">
+		<title>coco crate へドキュメントの誤字修正のプルリク出した(マージされた)</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/stjepang/coco">stjepang/coco: Concurrent collections (deprecated in favor of Crossbeam)</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/stjepang/coco/pull/19">Fix typo: `s/Attemps/Attempts/` by lo48576 · Pull Request #19 · stjepang/coco</link>
+			</li>
+			<li>
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99003430797812718">https://mastodon.cardina1.red/@lo48576/99003430797812718</link>
+			</li>
+		</ul>
+		<p>
+			内容について特に語ることはない。
+		</p>
+		<p>
+			deprecated って言ってるしどうしようか悩んだが、まあちょくちょく更新されてるっぽいので投げとくかということになった。
+		</p>
+	</section>
+
+	<section xml:id="gentoo-wiki-translation">
+		<title>Gentoo wiki の「ローカライゼーション/ガイド」記事を翻訳した</title>
+		<ul>
+			<li>
+				<link xl:href="https://wiki.gentoo.org/wiki/Localization/Guide/ja">ローカライゼーション/ガイド - Gentoo Wiki</link>
+			</li>
+			<li>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/99052287342886803">
+					<p>
+						typo 修正のついでに gentoo wiki の翻訳をしている
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-23T15:19:18+0900">2017-11-23 15:19:18</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/99052287342886803"><uri>https://mastodon.cardina1.red/@lo48576/99052287342886803</uri></link>
+					</footer>
+				</blockquote>
+				<blockquote cite="https://mastodon.cardina1.red/@lo48576/99052504633053193">
+					<p>
+						ローカライゼーション/ガイド - Gentoo Wiki<br />
+						<link xl:href="https://wiki.gentoo.org/wiki/Localization/Guide/ja">https://wiki.gentoo.org/wiki/Localization/Guide/ja</link><br />
+						ついでということで、未翻訳だった部分を全部翻訳しといた
+					</p>
+					<footer>
+						&#x2014;
+						<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+						<pubdate><time datetime="2017-11-23T16:14:34+0900">2017-11-23 16:14:34</time></pubdate>,
+						<link xl:href="https://mastodon.cardina1.red/@lo48576/99052504633053193"><uri>https://mastodon.cardina1.red/@lo48576/99052504633053193</uri></link>
+					</footer>
+				</blockquote>
+			</li>
+		</ul>
+		<p>
+			<link xl:href="https://twitter.com/i/web/status/933574118749827075">twitter で typo を発見したというツイートを見た</link>ので、
+			そういえば、いつぞや <code>LINGUAS</code> から <code>L10N</code> に引っ越せよ〜みたいなアナウンスがあったなぁと思いながら翻訳。
+		</p>
+		<p>
+			こういった技術文書は、特にプログラミング分野ではそうだが、往々にして英語に苦労する初心者/初学者は翻訳できるほど記事の内容に精通しておらず、内容を理解している人々はもはや英語で十分なので翻訳されている必要がないという、ニーズのミスマッチが大きい。
+			布教したければ、わかりきった内容の記事でも積極的に翻訳していくことが必要だ。
+		</p>
+		<p>
+			気持ちとしては未翻訳部分を発見次第気軽に訳したいのだが、英語に堪能でないので片手間でやれるほど簡単ではないというのが厄介。
+		</p>
+	</section>
+
+	<section xml:id="handlebars-rust-issue">
+		<title>handlebars-rust crate に issue 立てたら修正してもらえた</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/sunng87/handlebars-rust">sunng87/handlebars-rust: Rust templating with Handlebars</link>
+			</li>
+			<li>
+				<link xl:href="https://crates.io/crates/handlebars">handlebars - Cargo: packages for Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/sunng87/handlebars-rust/issues/194">Require `Sync` for `cause` of `RenderError` · Issue #194 · sunng87/handlebars-rust</link>
+			</li>
+		</ul>
+		<p>
+			エラー型がマルチスレッドを視野に入れてそうな設計だったのに微妙に使えない感じになっていたので issue を立てて聞いてみたところ、意図した状況ではなかったらしく、問題ない形に修正された。
+		</p>
+		<p>
+			これは static site generator で使おうとしていたライブラリなのだが、<link linkend="progress-opaque-typedef-crate">後述の進捗</link>を優先的にやることになったため、はてさて、いつになれば handlebars を使う段階までくるやら。
+		</p>
+	</section>
+
+	<section xml:id="strum-issue">
+		<title>strum crate に issue 立てた</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/Peternator7/strum">Peternator7/strum: A small rust library for adding custom derives to enums</link>
+			</li>
+			<li>
+				<link xl:href="https://crates.io/crates/strum">strum - Cargo: packages for Rust</link>
+			</li>
+			<li>
+				<link xl:href="https://github.com/Peternator7/strum/issues/12">ToString: implement `Display`, std doc says "`ToString` shouldn't be implemented directly" · Issue #12 · Peternator7/strum</link>
+			</li>
+		</ul>
+		<p>
+			<link xl:href="https://blog.cardina1.red/2017/08/26/weekly-2017-w34/#strum-pullrequest">昔プルリクを出したこともある</link> crate で、これは enum を文字列と相互変換するコードを自動生成する proc macro 。
+		</p>
+		<p>
+			<code>ToString</code> trait を実装していたが <code>format!("{}", some_enum)</code> のようにしても使えなかったので、おかしいと思って調べてみたところ、 <code>ToString</code> を直接実装するのは望ましくない、 <code>Display</code> を先に実装しろというお告げがちゃんと<link xl:href="https://doc.rust-lang.org/std/string/trait.ToString.html">標準ライブラリの <code>ToString</code> のドキュメント</link>に書いてあった。
+			これが意図したものか意図せぬものか不明だが、変更するにしても derive する名前とか属性名の変更をした方が良さそうだし、 breaking change になると思ったのでプルリクにせず issue を立ててみた次第。
+		</p>
+		<p>
+			進展はなく、返答待ち。
+		</p>
+	</section>
+</section>
+
+<section xml:id="private-activities">
+	<title>私的活動</title>
+
+	<section xml:id="progress-opaque-typedef-crate">
+		<title>opaque_typedef crate を作りはじめた (2017-11-29)</title>
+		<ul>
+			<li>
+				<link xl:href="https://github.com/lo48576/opaque_typedef">lo48576/opaque_typedef</link>
+			</li>
+		</ul>
+		<p>
+			static site generator を書くためのライブラリを作りたかったのだが、 strong typedef (opaque typedef) 相当のことを Rust でしたいとき<footnote xml:id="footnote-wants-strong-typedef-for-static-site-generator-lib" refmark-id="ref-footnote-wants-strong-typedef-for-static-site-generator-lib">
+				たとえば「 XML エンコード済の文字列のみを持てる <code>String</code> と <code>str</code> 」みたいなのが持ちたい、など
+			</footnote>あまりにボイラープレートが多いため、こりゃもうコード生成するしかねえな！という気持ちになり実装を開始した。
+			手応えはあるので、遠からず公開できそう。
+		</p>
+		<p>
+			これが一段落したら、今度は <code>str</code> と <code>String</code> のような、 slice と owned buffer の間の変換とかいい感じの trait の自動実装とかをする proc macro も実装したい。
+			そもそもそれが本来の目的なので、 opaque_typedef はその単純版というか、シンプルな部分を逃がしただけの実装に過ぎない。
+		</p>
+	</section>
+</section>
+
+<section xml:id="thoughts">
+	<title>考え事</title>
+	<section xml:id="level-of-doc-typo-fix-pullreq">
+		<title>プルリクを出すレベル</title>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99003435738677072">
+			<p>
+				ドキュメントの typo 修正のプルリク、そんなことで contributor 増やしてしまうかと思うとちょっと申し訳ない気分になるので、 issue で済ますかプルリク出すか悩む
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+				<pubdate><time datetime="2017-11-15T00:15:42+0900">2017-11-15 00:15:42</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99003435738677072"><uri>https://mastodon.cardina1.red/@lo48576/99003435738677072</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/99003439576098927">
+			<p>
+				contributor が増えると何が問題かというと、プロジェクトのライセンス変更とかで contributor の合意が必要になったりするのでアレ(まあ doc typo fix くらいは無視できるのかもしれないけど、そのあたりはライセンスのプロではないので詳しく知らない)
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+				<pubdate><time datetime="2017-11-15T00:16:41+0900">2017-11-15 00:16:41</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/99003439576098927"><uri>https://mastodon.cardina1.red/@lo48576/99003439576098927</uri></link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://mastodon.cardina1.red/@lo48576/98973726417849141">
+			<p>
+				doc comment はコードじゃないし、 typo fix なら著作権みたいなのも発生しなそうだし、無視できる気はする
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+				<pubdate><time datetime="2017-11-15T00:17:20+0900">2017-11-15 00:17:20</time></pubdate>,
+				<link xl:href="https://mastodon.cardina1.red/@lo48576/98973726417849141"><uri>https://mastodon.cardina1.red/@lo48576/98973726417849141</uri></link>
+			</footer>
+		</blockquote>
+		<p>
+			<link xl:href="https://togetter.com/li/997538">GitHub の Ricty リポジトリ閉鎖騒動 - Togetter</link> を思い出していた。
+		</p>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>雑感</title>
+	<ul>
+		<li>
+			進捗していくぞ〜
+		</li>
+		<li>
+			研究……ｱｯｱｯ
+		</li>
+		<li>
+			(Advent Calendar の準備が全然できてない顔)
+		</li>
+	</ul>
+</section>
+
+</article>

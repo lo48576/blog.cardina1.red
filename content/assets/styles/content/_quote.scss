@@ -1,0 +1,35 @@
+@import '../vars';
+
+blockquote {
+	border-left: 0.3rem solid #ccc;
+	padding: 0 0 0 $vertical-unit/2;
+}
+
+// FIXME: Do NOT set `quotes` based on `q/@lang`.
+// See <https://w3c.github.io/i18n-drafts/questions/qa-the-q-element.en>.
+q:not(.no-css-quotes) {
+	&[lang|="en"] {
+		// U+201C: LEFT DOUBLE QUOTATION MARK
+		// U+201D: RIGHT DOUBLE QUOTATION MARK
+		// U+2018: LEFT SINGLE QUOTATION MARK
+		// U+2019: RIGHT SINGLE QUOTATION MARK
+		quotes: "\201C" "\201D" "\2018" "\2019";
+	}
+	&[lang|="ja"] {
+		// U+300C: LEFT CORNER BRACKET
+		// U+300D: RIGHT CORNER BRACKET
+		// U+300E: LEFT WHITE CORNER BRACKET
+		// U+300F: RIGHT WHITE CORNER BRACKET
+		quotes: "\300C" "\300D" "\300E" "\300F";
+	}
+	&::before {
+		content: open-quote;
+	}
+	&::after {
+		content: close-quote;
+	}
+}
+
+q.no-css-quotes {
+	quotes: none;
+}

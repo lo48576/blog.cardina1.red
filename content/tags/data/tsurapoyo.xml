@@ -1,0 +1,21 @@
+---
+title: "つらぽよ"
+kind: tag
+
+excerpt: "つらぽよな話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-tsurapoyo"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>つらぽよ</title>
+
+<p>
+	つらぽよな話題。
+</p>
+
+</article>
