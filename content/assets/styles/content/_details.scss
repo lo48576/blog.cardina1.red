@@ -1,0 +1,18 @@
+@import '../vars';
+
+details {
+	summary:first-child + * {
+		margin: $vertical-unit/2 0 0;
+	}
+}
+
+summary {
+	cursor: pointer;
+
+	details >&::after {
+		content: " (クリックで展開)";
+	}
+	details[open] >&::after {
+		content: " (クリックで折り畳み)";
+	}
+}

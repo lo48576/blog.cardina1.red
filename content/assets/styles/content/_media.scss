@@ -1,0 +1,41 @@
+%blur-container {
+	// "Blur" filter (applied by `%blur-mask`) will let images overflow.
+	// `overflow: hidden;` prevent this.
+	overflow: hidden;
+	display: inline-block;
+}
+
+%blur-mask {
+	filter: blur(15px);
+
+	&:hover {
+		transition: filter 1.5s ease;
+		filter: blur(0);
+	}
+}
+
+img {
+	max-width: 100%;
+	height: auto;
+
+	&.tiny {
+		max-height: calc(100vh / 2);
+		max-width: calc(100vh / 2);
+	}
+
+	.mediaobject & {
+		vertical-align: bottom;
+	}
+}
+
+.blur-container {
+	@extend %blur-container;
+
+	.mediaobject & {
+		vertical-align: bottom;
+	}
+
+	>img.blur {
+		@extend %blur-mask;
+	}
+}

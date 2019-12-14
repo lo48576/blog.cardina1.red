@@ -1,0 +1,23 @@
+---
+title: "不完全"
+kind: tag
+imply:
+  - blog-meta
+
+excerpt: "不完全だったり書きかけの記事。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-meta"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>meta</title>
+
+<p>
+	不完全だったり書きかけの記事。
+</p>
+
+</article>

@@ -1,0 +1,421 @@
+---
+created_at: 2016-06-15T18:23:14+0900
+published_at: 2016-06-15T18:23:14+0900
+updated_at: 2016-06-21T23:15:14+0900
+format: article2019
+title: "エロゲインストールバトル"
+tags:
+  - windows-10
+  - virtualbox
+  - troubleshooting-solved
+kind: article
+article_metadata:
+  image_url: "maitetsu-run-error1.png"
+  image_base: "relpath"
+  image_alt: "ゲーム『まいてつ』で謎のエラーが出て起動できない"
+
+excerpt: "エロゲのインストールに失敗した。つらい。エロゲしたかっただけなのにどうしてこんな目に。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2016-06-15-erg-install-battle"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>エロゲインストールバトル</title>
+<section xml:id="tl-dr">
+	<title>TL;DR</title>
+	<p>
+		この記事は試行のログとつらぽよを吐き出す場所であり、大多数の人にとって、特に問題解決に寄与するものではないと思われる。
+	</p>
+	<p>
+		一応<xref linkend="conclusion" />は用意したのでそちらを参照。
+	</p>
+	<p>
+		問題は解決した。
+		<link linkend="solved">追記2</link>を参照。
+	</p>
+</section>
+
+<section xml:id="environment">
+	<title>環境</title>
+	<p>
+		仮想マシン上のWindows 10でインストール・起動を試みた。
+		ホストはgentoo 64-bitである。
+	</p>
+	<!-- FIXME: `class="visual"` is specific for my blog. -->
+	<table xml:id="table-env">
+		<caption>環境</caption>
+		<tbody>
+			<tr>
+				<th>Host OS (<code>uname -a</code>)</th>
+				<td>Linux veg 4.5.6-gentoo #2 SMP PREEMPT Fri Jun 10 13:03:28 JST 2016 x86_64 Intel(R) Core(TM) i7-4500U CPU @ 1.80GHz GenuineIntel GNU/Linux</td>
+			</tr>
+			<tr>
+				<th>VirtualBox, Oracle VM VirtualBox Extension Pack</th>
+				<td>5.0.20 r106931</td>
+			</tr>
+			<tr>
+				<th>OS</th>
+				<td>Windows 10 (64-bit)</td>
+			</tr>
+			<tr>
+				<th>VirtualBox 設定</th>
+				<td>
+					<table xml:id="table-system">
+						<caption>システム</caption>
+						<tbody>
+							<tr>
+								<th>メインメモリ</th>
+								<td>3072 MB</td>
+							</tr>
+							<tr>
+								<th>プロセッサ(コア数)</th>
+								<td>2</td>
+							</tr>
+							<tr>
+								<th>アクセラレーション</th>
+								<td>VT-x/AMD-V, ネステッドページング, PAE/NX, Hyper-V 準仮想化</td>
+							</tr>
+						</tbody>
+					</table>
+					<table xml:id="table-display" class="visual">
+						<caption>ディスプレイ</caption>
+						<tr>
+							<th>ビデオメモリ</th>
+							<td>256 MB</td>
+						</tr>
+						<tr>
+							<th>アクセラレーション</th>
+							<td>2D ビデオ, 3D</td>
+						</tr>
+						<tr>
+							<th>ビデオキャプチャ</th>
+							<td>無効</td>
+						</tr>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</section>
+
+<section xml:id="installing-anaoto">
+	<title>あなオトのインストール</title>
+	<table xml:id="table-anaoto-spec">
+		<caption>スペック</caption>
+		<tbody>
+			<tr>
+				<th>名称</th>
+				<td>あなたをオトコにしてあげる！</td>
+			</tr>
+			<tr>
+				<th>製品webページ</th>
+				<td><link xl:href="http://www.chuable.net/coup_con/"><uri>http://www.chuable.net/coup_con/</uri></link></td>
+			</tr>
+			<tr>
+				<th>対応OS(公称)</th>
+				<td>Windows Vista/7/8/10</td>
+			</tr>
+			<tr>
+				<th>インストール可否</th>
+				<td>成功</td>
+			</tr>
+			<tr>
+				<th>実行の可否</th>
+				<td>失敗</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<section xml:id="anaoto-install-challenge-1">
+		<title>インストールチャレンジ 1回目</title>
+
+		<section xml:id="anaoto-install-challenge-1--autorun-and-directx-install">
+			<title>Autorunでのスタートアップ起動からのDirectXインストール</title>
+
+			<p>
+				DVDDを突っ込み、autorun(「スタートアップ」)を起動する。
+				問題なく動く。
+				あなオトは新しめ(2016/04発売)の作品だったので、念のため「DirectXインストール」を実行した。
+				後から考えれば、これが失敗だったのかもしれない。
+			</p>
+			<figure xml:id="fig-anaoto-autorun-success">
+				<mediaobject>
+					<img src="anaoto-autorun-success.png" alt="あなオトランチャ起動成功の図" />
+				</mediaobject>
+				<caption>autorunによるスタートアップ。期待が高まる</caption>
+			</figure>
+		</section>
+
+		<section xml:id="anaoto-install-challenge-1--installed-but-cannot-start">
+			<title>インストール完了からの起動失敗</title>
+
+			<p>
+				起動に失敗した。
+				メッセージからするに<strong>DirectX 9のエラー</strong>である。
+			</p>
+			<figure xml:id="fig-anaoto-run-error">
+				<mediaobject>
+					<img src="anaoto-run-error.png" alt="あなオト起動失敗の図" />
+				</mediaobject>
+				<!-- TODO: Allow word wrap. -->
+				<screen>あなたをオトコにしてあげる！.exe - エントリ ポイントが見つかりません
+
+プロシージャ エントリ ポイント SfmDxGetSwapChainStats がダイナミック リンク ライブラリ C:\WINDOWS\SYSTEM32\d3d9.dll から見つかりませんでした。
+</screen>
+				<caption>あなオト起動失敗</caption>
+			</figure>
+
+			<p>
+				実はこのエラー自体は、<strong>Windows 7からWindows 10にアップグレードした辺りから</strong>『ものべの』(これはWin7でインストールし正常に動作していた)でも出るようになったが、ものべのでは同じメッセージのエラーが出た後「OK」を押すと、ゲームは起動し問題なく動作した。
+				しかし、あなオトでは起動さえしない。
+				参った。
+			</p>
+			<figure xml:id="fig-monobeno-dx9-error">
+				<mediaobject>
+					<img src="monobeno-dx9-error.png" alt="ものべのでも同様のエラーが出る図" />
+				</mediaobject>
+				<caption>『ものべの』でも同じエラーが出るが、こちらはその後問題なく起動する</caption>
+			</figure>
+		</section>
+	</section>
+
+	<section xml:id="anaoto-install-challenge-2">
+		<title>インストールチャレンジ 2回目: スタートアップ失敗</title>
+
+		<p>
+			再起動とアンインストール後、改めてインストールを試みる。
+			結果がこれ:
+		</p>
+		<figure xml:id="fig-anaoto-autorun-error">
+			<mediaobject>
+				<img src="anaoto-autorun-error.png" alt="あなオトスタートアップすら失敗の図" />
+			</mediaobject>
+			<!-- TODO: Allow word wrap. -->
+			<screen>autorun.exe
+
+autorun.exe は動作を停止しました
+
+問題が発生したため、プログラムが正しく動作しなくなりました。プログラムは閉じられ、解決策がある場合は Windows から通知されます。
+</screen>
+			<caption>あなオト、今度はスタートアップ(autorun)すら落ちるようになった</caption>
+		</figure>
+		<p>
+			やばい。
+			最初の正常起動時との変化といえば、DirectXを入れ直したくらいしか思い浮かばない。
+		</p>
+
+		<p>
+			この後、VirtualBoxのHDDイメージを古いものに戻して再度実行を試みたり、DirectXのwebインストーラをMicrosoftから落としてきてインストールしてみたり、
+			スタートアップ(autorun)を経由せず直接DVD上のインストーラやDirectXインストーラを実行したりと色々試したが、
+			結局スタートアップは起動せず、ゲームも起動に失敗しつづけた。
+		</p>
+	</section>
+</section>
+
+<section xml:id="installing-koinaka">
+	<title>こいなかのインストール</title>
+
+	<p>
+		翌朝になっても相変わらず解決策が見えなかったため、<strong>諦めて別のゲームを入れることにした</strong>。
+	</p>
+	<table xml:id="table-koinaka-spec">
+		<caption>スペック</caption>
+		<tbody>
+			<tr>
+				<th>名称</th>
+				<td>こいなか -小田舎で初恋×中出しセクシャルライフ-</td>
+			</tr>
+			<tr>
+				<th>製品webページ</th>
+				<td><link xl:href="http://www.e-rondo.jp/products/dev001kn/top.html"><uri>http://www.e-rondo.jp/products/dev001kn/top.html</uri></link></td>
+			</tr>
+			<tr>
+				<th>対応OS(公称)</th>
+				<td>Windows XP/Vista/7/8</td>
+			</tr>
+			<tr>
+				<th>インストール可否</th>
+				<td>失敗のち成功</td>
+			</tr>
+			<tr>
+				<th>実行の可否</th>
+				<td>成功</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<section xml:id="anaoto-install-challenge">
+		<title>インストールチャレンジ</title>
+
+		<section xml:id="anaoto-install-challenge--install-failure">
+			<title>お約束のインストール失敗</title>
+
+			<p>
+				まず普通にDVDを入れてインストーラを起動する。
+				こいなかでは、あなオトのようにランチャー的なものは用意されておらず、普通にInstallShieldのインストーラが起動した。
+				そこで出たのがこのエラー:
+			</p>
+			<figure xml:id="fig-koinaka-install-wrong-function">
+				<mediaobject>
+					<img src="koinaka-install-wrong-function.png" alt="こいなかインストーラのエラーの図" />
+				</mediaobject>
+				<!-- TODO: Allow word wrap. -->
+				<screen>ファンクションが間違っています。</screen>
+				<caption>こいなかのインストーラでエラーが出て失敗</caption>
+			</figure>
+			<p>
+				もういやだ。
+			</p>
+		</section>
+
+		<section xml:id="anaoto-install-challenge--cannot-copy-from-dvd">
+			<title>DVDからファイル群をコピーしてきてローカルで実行することを試みるも失敗</title>
+
+			<p>
+				DVDあたりで良くない何かがあるのかと考え、DVDからローカルへファイル群を丸ごとコピーしてから実行すれば良いのではと考えた。
+				そこでコピーしようとした結果がこちら:
+			</p>
+			<figure xml:id="fig-koinaka-copy-invalid-ms-dos-function">
+				<mediaobject>
+					<img src="koinaka-copy-invalid-ms-dos-function.png" alt="こいなかDVDからのファイルコピーすら失敗の図" />
+				</mediaobject>
+				<!-- TODO: Allow word wrap. -->
+<screen>1件の中断されたアクション
+
+無効な MS-DOS ファンクションです。
+</screen>
+				<caption>こいなかのDVDからファイルをコピーするだけでも似たようなエラーで失敗</caption>
+			</figure>
+			<p>
+				どうもDVDかDVDドライブあたりのエラーのようである。
+				DVDを眼鏡拭きで拭くなどして再試行してみてもやはり失敗する。
+			</p>
+		</section>
+
+		<section xml:id="anaoto-install-challenge--ddrescue-dvd">
+			<title>DVDをddrescueでサルベージ(してみたらそもそも破損してなかった)</title>
+
+			<p>
+				DVDやHDDのデータが破損していた場合、<link xlink:href="https://www.gnu.org/software/ddrescue/"><code>ddrescue</code></link>コマンドを使うのが常識である。
+				というわけで、ホストのgentoo linuxで<code>ddrescue</code>してみたところ、<strong>そもそもエラーが発生しなかった</strong>。
+				ということはDVDとDVDドライブには問題がなく、Windows 10かVirtualBox側の問題だったということなのだろう。
+			</p>
+		</section>
+
+		<section xml:id="anaoto-install-challenge--mount-iso-image-and-successfully-installed">
+			<title>ISOイメージをDVDとしてVirtualBoxにマウントしてインストール成功</title>
+
+			<p>
+				<code>ddrescue</code>で吸い出したISOイメージをVirtualBoxで光学メディアとしてマウントし、再度インストールを試みる。
+				結果、成功した:
+			</p>
+			<figure xml:id="fig-koinaka-install-done">
+				<mediaobject>
+					<img src="koinaka-install-done.png" alt="こいなかインストール完了の図" />
+				</mediaobject>
+				<caption>DVDを直接使わずISOイメージを使った結果、インストールに成功</caption>
+			</figure>
+			<p>
+				もちろん、問題なく起動した:
+			</p>
+			<figure xml:id="fig-koinaka-run">
+				<mediaobject>
+					<img src="koinaka-run.png" alt="こいなか起動の図" />
+				</mediaobject>
+				<caption>起動成功。よーし、致すぞ！</caption>
+			</figure>
+		</section>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+	<ul>
+		<li>
+			ソフマップで良さげなエロゲを見付けたからといって衝動買いするべからず。
+			事前に体験版で動作確認すべし。
+		</li>
+		<li>
+			対応OSはあまりあてにならない。
+			気を抜くべからず。
+		</li>
+		<li>
+			VirtualBoxでDVDが読めなくとも、<strong>DVDの破損とは限らない</strong>。
+			落ち着いてホストで対処すべし。
+		</li>
+		<li>
+			<strong>Windowsを許さない、絶対にだ</strong>
+		</li>
+	</ul>
+	<p>
+		twitter上での実況は<link xlink:href="http://togetter.com/li/987957">エロゲインストールバトル - Togetterまとめ</link>にまとめてある。
+	</p>
+</section>
+
+<section xml:id="note">
+	<title>付記</title>
+	<section xml:id="reason-of-impulse-buying">
+		<title>衝動買いの理由</title>
+		<p>
+			中学校の同級生とソフマップに行ったら初回特典付きのものを発見した。
+			以前から気になっていたというのもあり購入を決めた。
+		</p>
+
+		<blockquote cite="https://twitter.com/i/web/status/728882674077573120">
+			<p>
+				←数年ぶりに中学の同級生と再開した流れでえっちなゲームを3本買ったのがこちら
+			</p>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://twitter.com/intent/user?user_id=2375406199">@lo48576@twitter.com</link></attribution>,
+				<pubdate><time datetime="2016-05-07T18:42:26.142+0900">2016-05-07 18:42:26</time></pubdate>,
+				<link xl:href="https://twitter.com/i/web/status/728882674077573120">Twitter</link>
+			</footer>
+		</blockquote>
+		<blockquote cite="https://twitter.com/i/web/status/728969641331023872">
+			<p>
+				致したいね <link xlink:href="https://t.co/If7XDNVDfR">pic.twitter.com/If7XDNVDfR</link>
+			</p>
+			<mediaobject>
+				<img src="tweet-728969641331023872.jpg" alt="" role="blur tiny" xl:href="https://twitter.com/i/web/status/728969641331023872" />
+			</mediaobject>
+			<footer>
+				&#x2014;
+				<attribution><link xl:href="https://twitter.com/intent/user?user_id=2375406199">@lo48576@twitter.com</link></attribution>,
+				<pubdate><time datetime="2016-05-08T00:28:00.751+0900">2016-05-08 00:28:00</time></pubdate>,
+				<link xl:href="https://twitter.com/i/web/status/728969641331023872">Twitter</link>
+			</footer>
+		</blockquote>
+	</section>
+
+	<section xml:id="maitetsu-error">
+		<title>追記(<time datetime="2016-06-18T21:10:25+0900">2016-06-18</time>): まいてつ体験版起動失敗</title>
+		<figure xml:id="fig-maitetsu-run-error">
+			<mediaobject>
+				<img src="maitetsu-run-error1.png" alt="まいてつ体験版起動時に出る最初のエラーの図" />
+			</mediaobject>
+			<mediaobject>
+				<img src="maitetsu-run-error2.png" alt="まいてつ体験版起動時に出る2つめのエラーの図" />
+			</mediaobject>
+			<caption>まいてつ起動時に、これら2つのメッセージが続けて出て、起動には失敗する</caption>
+		</figure>
+		<p>
+			想定外だった。
+			同じメーカーの『ものべの』が起動するからと完全に油断していた。
+			最悪だ。
+		</p>
+	</section>
+
+	<section xml:id="solved">
+		<title>追記2(<time datetime="2016-06-21T23:15:14+0900">2016-06-21</time>): 解決</title>
+		<p>
+			問題は解決された。
+			<link xlink:href="/2016/06/20/erg-install-battle-victory">エロゲインストールバトルに勝利</link>を参照。
+		</p>
+	</section>
+</section>
+</article>

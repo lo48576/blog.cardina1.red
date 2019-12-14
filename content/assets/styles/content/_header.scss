@@ -1,0 +1,54 @@
+@import '../vars';
+
+$header-font-size: 2.2rem, 1.8rem, 1.5rem, 1.3rem, 1.2rem, 1.1rem;
+
+@for $i from 1 to 7 {
+	%section-h#{$i} {
+		font-size: nth($header-font-size, $i);
+		@if $i != 1 {
+			border-bottom: 1px solid #ccc;
+		}
+		margin: $vertical-unit 0 0;
+		&:not(:first-child) {
+			margin: 0 0 $vertical-unit;
+		}
+
+		a.#{$permalink-head-class}::before {
+			display: inline-block;
+			margin-left: 0;
+			margin-right: 0.5em;
+			content: str-slice("######", 1, $i);
+			color: #aaa;
+		}
+		&:hover >a[href].#{$permalink-head-class}::before {
+			color: #666;
+		}
+
+		a.#{$permalink-tail-class}::after {
+			display: inline-block;
+			margin-left: 0.2em;
+			visibility: hidden;
+			color: #aaa;
+			// U+00A7 SECTION SIGN
+			// U+1F517 LINK SYMBOL
+			content: "\1f517";
+		}
+		&:hover >a[href].#{$permalink-tail-class}::after {
+			visibility: visible;
+			text-decoration: none;
+		}
+	}
+}
+
+@for $i from 1 to 7 {
+	// Avoid applying this style to `aside >h2`.
+	article, section {
+		h#{$i} {
+			@extend %section-h#{$i};
+		}
+	}
+
+	h#{$i}.section-header {
+		@extend %section-h#{$i};
+	}
+}

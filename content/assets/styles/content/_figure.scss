@@ -1,0 +1,13 @@
+@import '../vars';
+
+figure {
+	padding: $vertical-unit/2 $vertical-unit/2 $vertical-unit/4 $vertical-unit/2;
+	border: 1px solid #ccc;
+	border-radius: $vertical-unit/2;
+}
+
+figcaption:last-child {
+	padding: $vertical-unit/4 0 0 0;
+	border-top: 1px solid #999;
+	//text-align: right;
+}

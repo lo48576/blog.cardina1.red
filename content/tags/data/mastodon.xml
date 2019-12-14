@@ -1,0 +1,23 @@
+---
+title: "Mastodon"
+kind: tag
+imply:
+  - distributed-sns
+
+excerpt: "Mastodon の話題。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="tag-mastodon"
+	xml:lang="ja"
+	verison="0.1"
+>
+<title>Mastodon</title>
+
+<p>
+	Mastodon の話題。
+</p>
+
+</article>

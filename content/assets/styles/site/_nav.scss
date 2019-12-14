@@ -1,0 +1,50 @@
+@import '../vars';
+
+aside.article-info {
+	font-size: 0.7rem;
+
+	.article-dates p {
+		line-height: $vertical-unit;
+		margin: initial;
+	}
+}
+
+ul.blog-tags {
+	margin: 0;
+
+	>li {
+		// U+1F3F7 LABEL
+		$tag-prefix: "\1f3f7\20";
+
+		display: inline-block;
+		margin: 0;
+		&::before {
+			margin-left: 0.25em;
+			content: " / " $tag-prefix;
+		}
+		&:first-child::before {
+			content: $tag-prefix;
+		}
+	}
+}
+
+ul.blog-tag-classes {
+	margin: 0;
+
+	ul.blog-tags {
+		display: inline-block;
+	}
+}
+
+.next-prev-link {
+	>.next-link {
+		text-align: right;
+	}
+	@media screen and (min-width: 64rem) {
+		display: flex;
+
+		>.prev-link, >.next-link {
+			width: 50%;
+		}
+	}
+}

@@ -1,0 +1,15 @@
+@import 'vars';
+
+// Default margins for block elements.
+p,
+ul, ol,
+figure, figcaption,
+blockquote,
+pre,
+dl,
+table,
+details {
+	* + & {
+		margin: $vertical-unit 0 0;
+	}
+}

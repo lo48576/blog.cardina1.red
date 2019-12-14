@@ -1,0 +1,17 @@
+@import '../vars';
+
+details.toc {
+	background: #eee;
+	padding: $vertical-unit/2;
+	border: 1px solid #eee;
+	border-radius: $vertical-unit/2;
+
+	width: auto;
+
+	>summary::after {
+		content: " ...";
+	}
+	&[open] >summary::after {
+		display: none;
+	}
+}

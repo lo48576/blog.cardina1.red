@@ -1,0 +1,193 @@
+#!/usr/bin/env ruby
+
+require 'nokogiri'
+
+# Copied from <https://github.com/nanoc/nanoc/blob/70b5726576c79f2eaf0c258c225fe8948dbe324a/lib/nanoc/filters/relativize_paths.rb>.
+XHTML_RELPATH_SELECTORS = ['*/@href', '*/@src', 'object/@data', 'param[@name="movie"]/@content', 'form/@action', 'comment()'].freeze
+NOKOGIRI_SAVE_OPTIONS = ::Nokogiri::XML::Node::SaveOptions::NO_DECLARATION
+
+RELATIVIZE_PATH_XHTML_OPTS = {
+  type: :xml,
+  select: XHTML_RELPATH_SELECTORS,
+  nokogiri_save_options: NOKOGIRI_SAVE_OPTIONS,
+}
+COLORIZE_SYNTAX_XHTML_OPTS = {
+  default_colorizer: :pygmentsrb,
+  syntax: :xml,
+  pygmentsrb: {
+    options: {
+      classprefix: 'tok-',
+    }
+  }
+}
+
+# Preprocess {{{1
+preprocess do
+  create_archive_pages
+  create_article_list_pages
+end
+# }}}1
+
+# Assets {{{1
+# SCSS {{{2
+
+# Sass partials.
+ignore '/**/_*'
+
+# SCSS files.
+[:default, :sourcemap].each do |rep_name|
+  compile '/assets/styles/**/*.scss', rep: rep_name do
+    path = item.identifier.without_ext + '.css'
+    map_path = path + '.map'
+    options = {
+      syntax: :scss,
+      style: :compact,
+      css_path: path,
+      sourcemap_path: File.basename(map_path),
+    }
+    case rep_name
+    when :default
+      filter :sass, options
+      filter :relativize_paths, type: :css
+      write path
+    when :sourcemap
+      filter :sass_sourcemap, options
+      filter :relativize_paths, type: :css
+      write path + '.map'
+    end
+  end
+end
+# }}}2
+
+route '/assets/**/*' do
+  @item.identifier.to_s
+end
+# }}}1
+
+# Archive pages {{{1
+# Archive by date {{{2
+compile '/archive/index.xhtml' do
+  layout '/archive-date.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile %r[^/\d{4}/index\.xhtml] do
+  layout '/archive-by-year.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile %r[^/\d{4}/\d{2}/index\.xhtml] do
+  layout '/archive-by-year-month.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+# }}}2
+
+# Archive by index {{{2
+compile '/list/index.xhtml' do
+  layout '/archive-list-index.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile '/list/*/index.xhtml' do
+  layout '/archive-list.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+route '/list/**/*.xhtml' do
+  @item.identifier.to_s
+end
+# }}}2
+# }}}1
+
+# Articles {{{1
+compile '/articles/**/*.xml' do
+  format = -> target {
+    -> f { f === target || f.include?(target) }
+  }
+  case @item[:format]
+  when format('article2019') then
+    layout '/xsl/article2019.xsl'
+  else
+    raise RuntimeError.new("Unknown article format: #{@item[:format]}")
+  end
+  filter :colorize_syntax, **COLORIZE_SYNTAX_XHTML_OPTS
+  layout '/xsl/xhtml5ize.xsl'
+  snapshot :html_pre
+  layout '/article.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile '/articles/**/*.xhtml' do
+  filter :colorize_syntax, default_colorizer: :pygmentsrb, syntax: :xml
+  layout '/article.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+# /articles/**/yyyy-mm-dd-slug/**/index.{xhtml,xml} => /yyyy/mm/dd/slug/**/index.xhtml
+# /articles/**/yyyy-mm-dd-slug/**/*.{xhtml,xml} => /yyyy/mm/dd/slug/**/*/index.xhtml
+route %r[^/articles/(?:[^/]+/)*(\d{4})-(\d{2})-(\d{2})-(.+?)(?:/index)?\.(?:xhtml|xml)$] do |yyyy, mm, dd, slug_relpath|
+  "/#{yyyy}/#{mm}/#{dd}/#{slug_relpath}/index.xhtml"
+end
+
+# /articles/**/yyyy-mm-dd-slug/* => /yyyy/mm/dd/slug/*
+route %r[^/articles/(?:[^/]+/)*(\d{4})-(\d{2})-(\d{2})-(.+)$] do |yyyy, mm, dd, slug_relpath|
+  "/#{yyyy}/#{mm}/#{dd}/#{slug_relpath}"
+end
+# }}}1
+
+# Independent items {{{1
+# Feed {{{2
+compile '/feed.xml.*' do
+  filter :erb
+  write @item.identifier.without_ext
+end
+# }}}2
+# }}}1
+
+# Tags {{{1
+compile '/tags/data/*.xml' do
+  layout '/xsl/article2019.xsl'
+  filter :colorize_syntax, **COLORIZE_SYNTAX_XHTML_OPTS
+  layout '/xsl/xhtml5ize.xsl'
+  snapshot :html_pre
+  layout '/tag-page.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+route %r[^/tags/data/([^/]+)\.xml] do |tag,|
+  "/tags/#{tag}/index.xhtml"
+end
+# }}}1
+
+
+compile '/**/*.xhtml' do
+  layout '/page-base.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile '/**/*.xhtml.erb' do
+  filter :erb
+  layout '/page-base.xhtml.*'
+  filter :relativize_paths, **RELATIVIZE_PATH_XHTML_OPTS
+end
+
+compile '/**/*.json.erb' do
+  filter :erb
+end
+
+compile '/**/*' do
+end
+
+route '/**/*.{xhtml,json}.erb' do
+  @item.identifier.without_ext
+end
+
+route '/**/*' do
+  @item.identifier.to_s
+end
+
+layout '/xsl/**/*.xsl', :lo48576_xsl
+layout '/**/*.slim', :slim
+layout '/**/*.erb', :erb, trim_mode: '-'
+
+# vim: set foldmethod=marker :

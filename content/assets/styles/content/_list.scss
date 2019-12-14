@@ -1,0 +1,29 @@
+@import '../vars';
+
+ul {
+	list-style: disc;
+	ul {
+		list-style: circle;
+		ul {
+			list-style: square;
+		}
+	}
+}
+
+ol {
+	list-style: decimal;
+}
+
+li {
+	//margin: 0 0 0 1.5rem;
+	margin: $vertical-unit/4 0 $vertical-unit/4 1.5rem;
+	line-height: $vertical-unit;
+
+	ul {
+		margin: 0;
+	}
+
+	>p, >blockquote {
+		margin: $vertical-unit/2 0;
+	}
+}

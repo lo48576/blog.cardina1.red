@@ -1,0 +1,65 @@
+@import '../vars';
+
+$border-width: 1px;
+$border-style: solid;
+$border-color: #ddd;
+$border: $border-width $border-style $border-color;
+
+table:not([role="presentation"]) {
+	margin-left: auto;
+	margin-right: auto;
+	border-collapse: collapse;
+	border: $border;
+
+	caption {
+		font-weight: bolder;
+		color: $block-title-color;
+		background: inherit;
+	}
+
+	table:not([role="presentation"]) {
+		// No problem because the parent (`th` or `td`) have padding.
+		margin: 0;
+	}
+
+	thead, tbody, tfoot {
+		&:not(:first-child) {
+			border-left: $border;
+		}
+	}
+
+	thead, tfoot {
+		background: #f4f4ff;
+	}
+
+	//thead, tfoot {
+	//    // Make `tfoot` also sticky to make it wrap over `thead` when only the
+	//    // bottom line of the table is shown.
+	//    position: sticky;
+	//    top: 0;
+
+	//    th, td {
+	//        background: #f4f4ff;
+	//        // Workaround for collapsed border and sticky position.
+	//        // See <https://stackoverflow.com/a/41883019>.
+	//        background-clip: padding-box;
+	//    }
+	//}
+
+	thead {
+		border-bottom: $border;
+	}
+
+	tr {
+		border: $border;
+	}
+
+	th, td {
+		padding: 0.5em 0.7em;
+		border: $border;
+	}
+
+	th {
+		//background: #f4f4ff;
+	}
+}

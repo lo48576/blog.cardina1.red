@@ -1,0 +1,101 @@
+---
+created_at: 2016-03-24T00:26:45+0900
+published_at: 2016-03-24T00:26:45+0900
+updated_at: 2017-06-01T17:52:32+0900
+format: article2019
+title: "Rust-1.7.0でDefault::default()を使ったコードのコンパイルが通らない、処理系の不具合と思われる挙動"
+tags:
+  - prog-rust
+  - troubleshooting-first-aided
+kind: article
+
+excerpt: "Rust-1.7.0でDefault::default()を使ったコードのコンパイルが通らない、処理系の不具合と思われる挙動に遭遇した。回避策はあるが、つらい。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2016-03-24-rust-default-wont-conpile"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Rust-1.7.0でDefault::default()を使ったコードのコンパイルが通らない、処理系の不具合と思われる挙動</title>
+<p>
+	未解決。
+	<link linkend="first-aid">応急処置</link>済。
+</p>
+
+<section xml:id="abstract">
+	<title>概要</title>
+	<p>
+		Rust-1.7で以下のコードのコンパイルが通らない。
+	</p>
+	<figure xml:id="figure-invalid-code-sample">
+		<programlisting language="rust"><![CDATA[use std::fmt::Debug;
+
+#[derive(Debug, Default)]
+struct Struct<T: Debug> {
+    pub opt: Option<T>,
+}
+
+impl<T: Debug> Struct<T> {
+    pub fn new() -> Self {
+        Default::default() // bad
+        //Struct { opt: Default::default(), } // ok
+    }
+}
+
+pub fn main () {
+    let s = Struct::<i32>::new();
+    println!("s: {:?}", s);
+}]]></programlisting>
+		<caption>コンパイルの通らないバージョン (<link xl:href="https://play.rust-lang.org/?code=use%20std%3A%3Afmt%3A%3ADebug%3B%0A%0A%23[derive%28Debug%2C%20Default%29]%0Astruct%20Struct%3CT%3A%20Debug%3E%20{%0A%20%20%20%20pub%20opt%3A%20Option%3CT%3E%2C%0A}%0A%0Aimpl%3CT%3A%20Debug%3E%20Struct%3CT%3E%20{%0A%20%20%20%20pub%20fn%20new%28%29%20-%3E%20Self%20{%0A%20%20%20%20%20%20%20%20Default%3A%3Adefault%28%29%20%2F%2F%20bad%0A%20%20%20%20%20%20%20%20%2F%2FStruct%20{%20opt%3A%20Default%3A%3Adefault%28%29%2C%20}%20%2F%2F%20ok%0A%20%20%20%20}%0A}%0A%0A%0A%0Apub%20fn%20main%20%28%29%20{%0A%20%20%20%20let%20s%20%3D%20Struct%3A%3A%3Ci32%3E%3A%3Anew%28%29%3B%0A%20%20%20%20println!%28%22s%3A%20{%3A%3F}%22%2C%20s%29%3B%0A}&amp;version=stable">Rust Playgroundへのリンク</link>)</caption>
+	</figure>
+	<figure xml:id="figure-error-message-sample">
+		<screen><![CDATA[<anon>:10:9: 10:25 error: the trait `core::default::Default` is not implemented for the type `T` [E0277]
+<anon>:10         Default::default() // bad
+                  ^~~~~~~~~~~~~~~~
+<anon>:10:9: 10:25 help: see the detailed explanation for E0277
+<anon>:10:9: 10:25 note: required by `core::default::Default::default`]]></screen>
+		<caption>Rust Playgroundで(Rust-1.7.0 stableで)コンパイルした場合のエラーメッセージ</caption>
+	</figure>
+	<p>
+		おかしい。
+	</p>
+	<p>
+		<link xl:href="https://doc.rust-lang.org/std/option/enum.Option.html#implementations">ドキュメント</link>によれば、<code>Option&lt;T&gt;</code>は<code>Default</code> traitを実装していて、その際<code>T</code>に対して<code>T: Default</code>等の制約はかかっていない。
+		(コメントアウトされている<code language="rust">opt: Default::default()</code>のコンパイルが通るのはそのためである)。
+	</p>
+	<p>
+		しかし、構造体のメンバ変数(の型)すべてが<code>Default</code>を実装しているにも関わらず、「<code>T</code>が<code>Default</code>を実装していない」という理由でコンパイルは失敗する。
+	</p>
+	<p>
+		奇妙なのは、<code>Struct&lt;T&gt;</code>全体に対しての<code language="rust">Default::default()</code>呼び出しが失敗するにも関わらず、<code language="rust">#[derive(Debug, Default)]</code>にはコンパイラが何の文句も言ってこないところだ。
+	</p>
+	<p>
+		やっぱりgithubでissueとか投げるべきなのかなぁ……
+	</p>
+</section>
+<section xml:id="first-aid">
+	<title>応急処置</title>
+	<p>
+		コード例のとおり、<code language="rust">Default::default()</code>が失敗するのは構造体全体に対してのみであるため、各メンバ変数それぞれについて<code language="rust">Default::default()</code>を呼び出すことで、意図した通りのオブジェクトを生成することは可能である。
+		メンバ変数が沢山あると大変だが、仕方がない……
+	</p>
+</section>
+<section xml:id="postscript">
+	<title>追記 (2016-03-24 02:23)</title>
+	<p>
+		すごい後輩氏が該当issueを見付けてくれた。 &gt; <link xl:href="https://github.com/rust-lang/rust/issues/26925">#[derive] is too conservative with field trait bounds · Issue #26925 · rust-lang/rust</link><br />
+		すごい。<br />
+		このissue、ここ4ヶ月ほど動きがないようだが、ひとまず動きを注視することにしてみようと思う。
+		(でも再燃させた方がよかったりするのかなぁ……)
+	</p>
+</section>
+<section xml:id="postscript2">
+	<title>追記2 (2017-06-01 17:52)</title>
+	<p>
+		<link xl:href="http://qnighy.hatenablog.com/entry/2017/06/01/070000">Rustのderiveはあまり頭がよくない - 簡潔なQ</link> で問題が説明されている。
+	</p>
+</section>
+</article>
