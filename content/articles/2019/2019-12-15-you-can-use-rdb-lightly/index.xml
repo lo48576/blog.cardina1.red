@@ -1,0 +1,742 @@
+---
+created_at: 2019-12-15T02:44:06+09:00
+published_at: 2019-12-15T23:43:29+09:00
+format: article2019
+title: "RDB がお好き？ けっこう。ではこの話は終了になりますよ。"
+tags:
+  - advent-calendar
+  - computer
+kind: article
+article_metadata:
+  image_url: "pma-karaoke-schema-square.png"
+  image_base: "relpath"
+  image_alt: "カラオケ履歴管理に RDB を使ってみた"
+
+excerpt: "表計算ソフトが嫌になったら関係データベースがおすすめという話と、実際に RDB を使ってカラオケの履歴管理をした話。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2019-12-15-you-can-use-rdb-lightly"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>RDB がお好き？ けっこう。ではこの話は終了になりますよ。</title>
+
+<p>
+	表計算ソフトが嫌になったあなたに、関係データベース (RDB) がおすすめですよというお話をします。
+	あと、一応私が軽率に使ってみてどんな感じになっているか軽く紹介します。
+	おすすめですよという話と例の紹介はしますが、具体的にこうすると良いですよという話はしません。
+	「RDB はいいぞおじさん」です。
+</p>
+<p>
+	軽率に RDB を使っていこうな。
+</p>
+<p>
+	この記事は <link xl:href="https://blog.rogiken.org/blog/2019/12/14/first_electronic_work/">rogy Advent Calendar 2019</link> の15日目の記事です。
+		前日の記事は『<link xl:href="https://blog.rogiken.org/blog/2019/12/14/first_electronic_work/">初めて電子工作した話</link>』でした。
+</p>
+
+<section xml:id="i-am-working-on-thesis" role="notoc">
+	<title>本題の前に</title>
+
+	<p>
+		まず一言言わせてほしいんですけれども。
+	</p>
+	<p>
+		<quote cite="https://blog.rogiken.org/blog/2019/12/14/first_electronic_work/"><qp>『</qp>明日はらりおさんの「修論？ まだ早い」です．明日のrogy Advent Calendar 2019もお楽しみに～．<qp>』</qp></quote>じゃあないんですよ。
+		これじゃあいかにも「まだ修論書き始めてない M2 がどうなるか眺めてようぜwww」みたいな感じじゃないですか<footnote xml:id="footnote-inflamers-voice" refmark-id="footnote-ref-inflamers-voice">
+			「今期最高のコンテンツ」「安心したいからまだ始めないで」などと嬉々として煽ってくる治安の悪い人々の満面の笑みが脳裏を過ります
+		</footnote>。
+	</p>
+	<p>
+		私の Twitter アカウント、指導教員に監視されてるんですよ。
+		近隣ラボの学生とかにも滅茶苦茶煽られるんですよ。
+		顔を見るたび煽られるんですよ。
+	</p>
+	<p>
+		煽る気がないのは重々承知なんですが、ナイ〜ブな状態の M2 には効くやつなので勘弁してください。
+		私が12月の半ばにもなって「修論？ まだ早い」とかほざいているなどという事実はありません<footnote xml:id="footnote-too-late" refmark-id="footnote-ref-too-late">
+			じゃあ Adventar に書いたコメントは何なんだという話ですが、 AdC にエントリーした当時はまだ早かったんですよ <sup>[要出典]</sup>
+		</footnote>！
+	</p>
+	<p>
+		それでは、以下本編です。
+	</p>
+</section>
+
+<hr />
+
+<section xml:id="would-you-like-spreadsheet">
+	<title>ご注文は表計算ソフトですか？？</title>
+
+	<p>
+		いいえ<footnote xml:id="footnote-personal-preference" refmark-id="footnote-ref-personal-preference">
+			感想や程度には個人差があります。
+		</footnote>。
+	</p>
+	<p>
+		まあ愚痴ると色々あるんですが、端的に言えば以下の点において表計算ソフト (特に○クセル) には不満があります。
+	</p>
+
+	<section xml:id="would-you-like-spreadsheet--tightly-coupled-layout-and-structure">
+		<title>表示上のレイアウトとデータ構造が不可分である</title>
+
+		<p>
+			表計算において、変数としてセルを用いますが、同時にセルは表示のためにも利用されます。
+			これが何を意味するかというと、「セルを計算に都合の良い位置ではなく表示したい位置に配置しなければならない」ということです。
+		</p>
+		<p>
+			計算用のセルと表示用のセルを別々に用意することもできますが、その場合一段階の余計な indirection が必要になり、また表示されている場所からデータを直接編集することはできなくなります。
+		</p>
+	</section>
+
+	<section xml:id="would-you-like-spreadsheet--compatibility-and-lockin">
+		<title>互換性あるいはロックイン</title>
+
+		<p>
+			今更○クセルが囲い込みをしているなどと言う気もありませんが<footnote xml:id="footnote-open-standard-for-office-documents" refmark-id="footnote-ref-open-standard-for-office-documents">
+				オフィススイート用フォーマットとしては OOXML や ODF などが標準化されており、たしか近頃の MS Office 製品も OOXML を利用していたはずです
+			</footnote>、では互換性が十分かといえば全然そんなことはありませんね。
+			データの編集ができてもレイアウトの再現や保存ができなくて却下されてしまうなどの事例があります。
+		</p>
+		<p>
+			事例がありますというか、私が勤務報告書のｴｸｾﾙファイルを LibreOffice で編集できないため溜息を吐きながらｲﾝﾄﾞｯｽﾞを起動するのもそういうことです。
+			いや、厳密には編集はできるんですが、 LibreOffice で保存すると EXCEL から見たときのとある図 (方眼紙) 上の色情報が変わってしまうらしく、「次から EXCEL で編集してください」と言われてしまいました<footnote xml:id="footnote-do-you-really-want-precise-color" refmark-id="footnote-ref-do-you-really-want-precise-color">
+				こんな CSV 程度で済む情報のために EXCEL をねぇ……
+			</footnote>。
+			これは先述の「表示上のレイアウトとデータ構造が不可分」とも繋がりますが、本質的に欲しいのがデータなのに表示用のレイアウトまで持ち回らないといけないというのは無駄が多くていけません。
+		</p>
+	</section>
+
+	<section xml:id="would-you-like-spreadsheet--lack-of-flexible-and-generic-api">
+		<title>柔軟かつ汎用の API の欠如</title>
+
+		<p>
+			CSV で済む程度の情報は CSV にしたい、では何故したいのかといえば、バッチ処理 (複数データを一気に弄る処理) が楽だからというのがあります。
+			あるいは入力のみならず出力においても、一部のデータだけ流し読みしたいこともあれば、複数の情報を結合して扱いたいときもありましょう。
+			こういうとき、いちいちオフィススイートのようなクソデカ激重グラフィカルアプリを起動したいだろうかという話です。
+		</p>
+		<p>
+			また、データの一部を取り出して別のプログラムで処理したいというときも、いちいちアプリケーションを起動して範囲選択してファイルに貼り付けて、と手間が多くていけません。
+		</p>
+	</section>
+
+	<section xml:id="would-you-like-spreadsheet--poorly-expressive">
+		<title>構造の表現力が貧弱</title>
+
+		<p>
+			これもレイアウトとデータ構造の不可分性に関わる話ですが、そもそも EXCEL で多少複雑なデータを置いておこうとすると、すぐに2次元の表の限界が来ます。
+			シートを分けたり行を離したりなどいろいろ工夫することはできるでしょうが、それらの間の関係は個々のセルの内容である計算式を見なければ判然としません。
+		</p>
+		<p>
+			大量のデータが保存されていたり見た目が整備されていればいるほど、たとえば時間が経って久々に開いたファイルの使い方や構造がよくわからなくなっていることでしょう。
+		</p>
+	</section>
+</section>
+
+<section xml:id="rdb-as-a-spreadsheet">
+	<title>スプレッドシートとしての RDB</title>
+
+	<p>
+		さて本題ですが、私からの提案は<strong>表計算ソフトの代わりに関係データベース管理システム (RDBMS) を使う</strong>ことです。
+		関係データベース (Relational DataBase, RDB) については<link linkend="what-is-rdb">後で簡単に紹介</link>しますが、非常に多くのサービスの裏で使われている「いわゆるデータベース」です。
+	</p>
+	<p>
+		アホくさいですか？
+		しかしこれが意外にイケるんです。
+	</p>
+
+	<section xml:id="rdb-as-a-spreadsheet--split-layout-and-data-structure">
+		<title>表示レイアウトとデータ構造が分離される</title>
+
+		<p>
+			RDB では、データはデータとして格納され、これを閲覧するときは必要に応じて SELECT したり view を利用することになります。
+			つまり、内部のデータ表現ではなく欲しい形のデータを閲覧することが可能です。
+		</p>
+		<p>
+			また、更新や追加なども内部のデータ構造を前提に行うもので、表示でどう利用するかを意識せず操作できます。
+		</p>
+	</section>
+
+	<section xml:id="rdb-as-a-spreadsheet--higher-compatibility">
+		<title>互換性は高め</title>
+
+		<p>
+			RDB の互換性が低いと思いますか？
+			それは RDB の機能をフル活用すべく直接操作したり web アプリケーションを実装したりなどすると気になってくるでしょうね。
+		</p>
+		<p>
+			しかし！
+			趣味でデータを溜めておく程度のことであれば、有名どころの RDB はどれも問題なく同じように使えることでしょう。
+			SQL には (一応) 標準がありますし、機能面でも少なくとも通常のクエリはひととおり動きます。
+		</p>
+		<p>
+			実は MySQL / MariaDB, PostgreSQL, SQLite ともに再帰クエリ (<code>WITH RECURSIVE</code>) に対応しているため、 RDB は表だけでなくグラフや木構造も自然に扱えるようになっているんです。
+		</p>
+		<p>
+			保存するデータの型が明示的なのも魅力です。
+			数値を入力したら日付になっているなんて意味不明なことも、 RDB を普通に使っていればまず起きません<footnote xml:id="footnote-wrong-type-is-wrong-design" refmark-id="footnote-ref-wrong-type-is-wrong-design">
+				べつに RDB でも「日付のはずのないカラムに DATETIME を設定していた」とかできるかもしれませんが、それは考えるまでもなくユーザがアホです。
+				そんなしょーもない話はしていません。
+			</footnote>。
+		</p>
+	</section>
+
+	<section xml:id="rdb-as-a-spreadsheet--flexible-and-generic-api">
+		<title>柔軟かつ汎用の API</title>
+
+		<p>
+			SQL の汎用性と柔軟性はあまりに魅力的です。
+			まあ実のところ若干方言っぽいのはあるんですが、基本的に様々な RDBMS 全部同時に使えないといけないとかでもなければ、自分が使っている構文だけ把握すればいいのでそんなに困りません。
+			そもそも何度も実行するものならスクリプト化なりメモからコピペ何なりして保存しておけば良いでしょう。
+		</p>
+		<p>
+			また、 SQL を触りたくなくとも、 Ruby や Python のような汎用のスクリプト言語からでも操作ができる (はず<footnote xml:id="footnote-rdb-adaptor-for-lightweight-languages" refmark-id="footnote-ref-rdb-adaptor-for-lightweight-languages">
+				使ってないので知らんけど。
+				そういう便利ライブラリが存在するに100ガバス
+			</footnote>) ので、ちょっと複雑なことをしたいというとき謎の BASIC 的言語を調べる必要もありません。
+			自分の使い慣れた言語でロジックを書けば良いのです。
+		</p>
+	</section>
+
+	<section xml:id="rdb-as-a-spreadsheet--highly-expressive">
+		<title>構造の表現力が強力</title>
+
+		<p>
+			RDB においては、テーブル (つまり表) とその関係という形でデータ構造が記述されます<footnote xml:id="footnote-it-is-why-rdb-is-rdb" refmark-id="footnote-ref-it-is-why-rdb-is-rdb">
+			関係を表現できるからこその「<strong>関係</strong>データベース」です
+		</footnote>。
+			つまり、ただ単にデータを散らして置いておくだけでなく、構造と関係性を定義して、後で関連するデータを繋げて引っ張ってくることができるということです。
+		</p>
+		<p>
+			また、この構造や関係性はセルの数式を覗き見ずともわかるものです。
+			「しばらくデータを使わないうちに、どこに何を追加すればいいのか忘れてしまった」などという悩みともおさらばです。
+			なにしろ RDB では表にも行にも名前が付いていて、参照関係まで明示されているのですから。
+		</p>
+	</section>
+</section>
+
+<section xml:id="what-is-rdb">
+	<title>RDB とは何ぞや</title>
+
+	<p>
+		さて話を進める前に、軽く RDB という概念について紹介しておきましょう。
+		……といきたいところですが、この辺りは厳密な話をすると長くなるのでサラっと流します。
+	</p>
+	<p>
+		関係データベース (RDB) の定義については別の書籍やサイトに任せるとして、 RDB は以下のような特徴を持っています。
+	</p>
+	<ul>
+		<li>
+			<phrase>
+				データベースはテーブル (表) の集合
+			</phrase>
+		</li>
+		<li>
+			<phrase>
+				テーブルには行と列がある
+			</phrase>
+			<ul>
+				<li>
+					<phrase>
+						行 (row) はひとかたまりのレコード (CSV での横列)
+					</phrase>
+				</li>
+				<li>
+					<phrase>
+						列 (column) はレコード中のデータ項目 (CSV での縦列)
+					</phrase>
+				</li>
+				<li>
+					<phrase>
+						レコード (行データ) を集めたものがテーブルのデータ
+					</phrase>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>
+				テーブルは関係を持てる
+			</phrase>
+			<ul>
+				<li>
+					<phrase>
+						たとえば「この列のデータは実は別のテーブルの行を参照するポインタ (みたいなもの) である」などが表現できる
+					</phrase>
+				</li>
+			</ul>
+		</li>
+	</ul>
+	<p>
+		なんとなくスプレッドシートっぽいような、そうでもないような、微妙な印象でしょうか。
+		まあ正直これでは何のことだかサッパリだと思うので、軽率な使い方の具体例を図とともに見ていきましょう。
+	</p>
+</section>
+
+<section xml:id="karaoke-activities-in-rdb">
+	<title>カラオケで歌った歌を管理してみる</title>
+
+	<p>
+		なんかもうﾊｲという感じですが、やっていきましょう。
+	</p>
+
+	<section xml:id="karaoke-activities-in-rdb--spreadsheet">
+		<title>スプレッドシートでやるなら？</title>
+
+		<p>
+			もしこれを表計算ソフトでやるなら、皆さんはどうデータを入力するでしょうか。
+			ありがちなのは以下のような感じ？
+		</p>
+		<figure>
+			<table>
+				<caption>カラオケ活動履歴</caption>
+				<thead>
+					<tr>
+						<th>日付</th>
+						<th>曲名</th>
+						<th>歌手</th>
+						<th>機種</th>
+						<th>メモ・感想</th>
+					</tr>
+				</thead>
+				<tr>
+					<td>2019-01-01</td>
+					<td>ぽよぽよ</td>
+					<td>The Various Artists</td>
+					<td>D○M</td>
+					<td>最初の90秒しか覚えてなかった</td>
+				</tr>
+				<tr>
+					<td>2019-01-01</td>
+					<td>ほげほげ</td>
+					<td>The Singer</td>
+					<td>D○M</td>
+					<td>伴奏の再現度が低くて萎えた</td>
+				</tr>
+				<tr>
+					<td>2019-01-01</td>
+					<td>あぁ＾〜</td>
+					<td>The Various Artists</td>
+					<td>D○M</td>
+					<td></td>
+				</tr>
+				<tr>
+					<td>...</td>
+					<td>...</td>
+					<td>...</td>
+					<td>...</td>
+					<td>...</td>
+				</tr>
+			</table>
+			<caption>素朴な表で管理するカラオケ活動の例</caption>
+		</figure>
+		<p>
+			さて実に素朴ではありますが、残念ながらこの構成にはいくらか問題がありそうです。
+		</p>
+		<ul>
+			<li>
+				<phrase>
+					曲名や歌手名の重複の扱い
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							同名の曲や同じ名前で別実体のアーティストがあった場合、このデータでそれを判別することは困難です。
+							同名の曲で別名のアーティストであれば判別できるでしょうが、同名の別アーティストを判別可能にするためには何らかの妥協が必要そうです。
+						</p>
+						<p>
+							重複はデータサイズにも影響します。
+							たとえば曲名が滅茶苦茶長い曲を100回歌えば、曲名の100倍のデータ量を保存することになります<footnote xml:id="footnote-compression-in-spreadsheet" refmark-id="footnote-ref-compression-in-spreadsheet">
+								実際は圧縮がかかるので100倍とはいかないでしょうが、データの具合次第で重複による無駄が増えることは間違いありません
+							</footnote>。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					データの精度
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							日付を使ってカラオケ活動を管理していますが、それ本当に大丈夫ですか？
+							たとえば1日に2回別のカラオケに行くことがあったら、区別したくはありませんか？
+							今は良いかもしれませんが、後になって変更しようとすると面倒ですよ。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					単位が活動しかない
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							この表だと、1回の歌唱活動ごとにメモを付けられるようになっています。
+							でも、一回一回の歌唱ではなく、曲やアーティスト自体に対してコメントを付けたくなることは考えられませんか？
+							あるいは、「JOYS○UND に入っている○○という曲」にだけコメントを付けたくなるかもしれません<footnote xml:id="footnote-comment-for-a-song-in-a-model" refmark-id="footnote-ref-comment-for-a-song-in-a-model">
+								たとえば「曲は入ってるがピアノロールが出ない」とか
+							</footnote>。
+						</p>
+						<p>
+							別のシートを作ったり離れた場所に表を作って別個に管理しても良いでしょうが、今度は連携して検索したり修正したりなどが面倒になってしまいそうです。
+						</p>
+					</li>
+				</ul>
+			</li>
+		</ul>
+		<p>
+			……とまあこのように設計に悩みどころの見えるスプレッドシート管理ですが、では RDB を使うとどうなるか見てみましょう。
+		</p>
+	</section>
+
+	<section xml:id="karaoke-activities-in-rdb--my-example">
+		<title>RDB でやるなら？</title>
+
+		<section xml:id="karaoke-activities-in-rdb--my-example--schema">
+			<title>データ構造</title>
+
+			<p>
+				以下は私が利用しているスキーマ (データ構造と関係) です。
+			</p>
+			<figure>
+				<mediaobject>
+					<img src="pma-karaoke-schema.png" alt="phpMyAdmin で表示したカラオケ用データベースのスキーマ。" />
+				</mediaobject>
+				<caption>私が使っているスキーマ (2019-12-15 時点)</caption>
+			</figure>
+			<figure>
+				<table>
+					<caption>sessions: カラオケ入店</caption>
+					<thead>
+						<tr>
+							<th>カラム</th>
+							<th>意味</th>
+							<th>型</th>
+							<th>コメント</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th>session_id</th>
+							<td>session の ID</td>
+							<td>整数</td>
+							<td>自動で付番される。</td>
+						</tr>
+						<tr>
+							<th>start_date</th>
+							<td>入店日</td>
+							<td>日付</td>
+							<td></td>
+						</tr>
+						<tr>
+							<th>date_index</th>
+							<td>その日のうちの入店回数</td>
+							<td>整数</td>
+							<td>1回目なら0、2回目なら1、以後同様。</td>
+						</tr>
+						<tr>
+							<th>start_datetime</th>
+							<td>開始日時</td>
+							<td>日時 (省略可)</td>
+							<td></td>
+						</tr>
+						<tr>
+							<th>comment</th>
+							<td>コメント</td>
+							<td>文字列 (省略可)</td>
+							<td>「大岡山の○○に行った」など。自由。</td>
+						</tr>
+					</tbody>
+				</table>
+				<table>
+					<caption>activities: 歌った一曲ごと</caption>
+					<thead>
+						<tr>
+							<th>カラム</th>
+							<th>意味</th>
+							<th>型</th>
+							<th>コメント</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th>activity_id</th>
+							<td>activity の ID</td>
+							<td>整数</td>
+							<td>自動で付番される。</td>
+						</tr>
+						<tr>
+							<th>session_id</th>
+							<td>session の ID</td>
+							<td>整数</td>
+							<td>sessions テーブルのカラムへの参照。</td>
+						</tr>
+						<tr>
+							<th>session_index</th>
+							<td>session 内での順番</td>
+							<td>整数</td>
+							<td>1曲目は0、2曲目は1、以後同様。</td>
+						</tr>
+						<tr>
+							<th>model_song_id</th>
+							<td>歌った曲</td>
+							<td>整数</td>
+							<td>model_songs テーブルのカラムへの参照。</td>
+						</tr>
+					</tbody>
+				</table>
+				<table>
+					<caption>songs: 楽曲</caption>
+					<thead>
+						<tr>
+							<th>カラム</th>
+							<th>意味</th>
+							<th>型</th>
+							<th>コメント</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th>song_id</th>
+							<td>song の ID</td>
+							<td>整数</td>
+							<td>自動で付番される。</td>
+						</tr>
+						<tr>
+							<th>title</th>
+							<td>曲名</td>
+							<td>文字列</td>
+							<td></td>
+						</tr>
+						<tr>
+							<th>description</th>
+							<td>曲の説明。</td>
+							<td>文字列 (省略可)</td>
+							<td></td>
+						</tr>
+						<tr>
+							<th>artist_id</th>
+							<td>歌手・アーティスト</td>
+							<td>整数</td>
+							<td>artists テーブルのカラムへの参照。</td>
+						</tr>
+					</tbody>
+				</table>
+				<caption>テーブルの定義の解説 (一部)。</caption>
+			</figure>
+			<p>
+				見たままです。
+				これ以上解説しても同じような感じになってしまうので省略します。
+			</p>
+		</section>
+
+		<section xml:id="karaoke-activities-in-rdb--my-example--views">
+			<title>閲覧の例</title>
+
+			<p>
+				で、閲覧するときは、たとえばこう見えます。
+			</p>
+			<figure>
+				<mediaobject>
+					<img src="pma-karaoke-view-human-activities.png" alt="view を使って活動履歴を閲覧できる。" />
+				</mediaobject>
+				<caption>
+					SQL クエリや view 機能を使うことで、好きなようにデータを連結・加工して表示できる。
+					選曲はスルーしてね。
+				</caption>
+			</figure>
+			<p>
+				歌そのもの、機種、歌った出来事、アーティスト、日時などなど、管理するときは全て別々のテーブルでしたが、表示するときは SQL 文をひとつ書くだけで、こうしてまとめて合成することができます。
+				もちろん、これを CSV 出力するなども簡単です。
+			</p>
+			<p>
+				もうひとつ、別の例をお見せしましょう。
+				回数順で並べたリストです。
+			</p>
+			<figure>
+				<mediaobject>
+					<img src="pma-karaoke-view-activities-stats.png" alt="view を使って活動傾向を閲覧できる。" />
+				</mediaobject>
+				<caption>
+					SQL クエリや view 機能を使うことで、好きなようにデータを連結・加工して表示できる。
+					選曲はスルーしてね。
+				</caption>
+			</figure>
+			<p>
+				このデータでは、 J○YSOUND で歌ったか D○M で歌ったかは気にせずカウントしています。
+				このように統計的な処理を施すことも、 RDB なら簡単です。
+				SQL を1行書くだけでできてしまいます。
+			</p>
+		</section>
+	</section>
+
+	<section xml:id="karaoke-activities-in-rdb--what-is-good">
+		<title>RDB で何が嬉しいか</title>
+
+		<p>
+			繰り返しになりますが、何が嬉しいのでしょうか。
+		</p>
+		<p>
+			まず、表示するときのことを考えず、データ本来の構造をそのまま反映させて管理できるようになりました。
+			表示するときも、欲しいデータを持つテーブルを JOIN してカラムを並べるような <code>SELECT</code> 文を書くだけです。
+			何度も同じ表示を使いそうなら、クエリを view として保存しておくこともできます。
+		</p>
+		<p>
+			互換性もそれなりに高いです。
+			SQL としてテーブル定義と内容データを吐き出し、定義の方をちょっと修正してやれば、たとえば SQLite にインポートすることもできます。
+			つまり (余程高レベルなことをしなければ) データベース管理ソフトはいつでも乗り替え可能ということです。
+		</p>
+		<p>
+			機能は柔軟で API も汎用のものが用意されています。
+			どのようなデータベースを弄るにしても、必要なのは RDB と SQL の基礎知識だけです。
+			スプレッドシートのように、ファイル毎に黒魔術のような謎の式を解読しないと弄るのが難しいなんてことはありません。
+		</p>
+		<p>
+			私は MariaDB を web インターフェース<footnote xml:id="footnote-phpmyadmin-web-interface" refmark-id="footnote-ref-phpmyadmin-web-interface">
+				厳密には phpMyAdmin の web インターフェース
+			</footnote>経由で利用していますが、お好みのデスクトップクライアント、たとえば LibreOffice Base 経由で操作することもできます。
+			Android にも SQL クライアントがありますから、そちらを利用してデータベースにアクセスすることもできます。
+			あるいはお好みの言語でスクリプトを書いて操作したり、専用の操作画面を持つクライアントを自作することだってできます。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="sqlite-studio-old-karaoke-view-activities.png" alt="SQLite のデータであれば SQLite Studio などで編集できる。" />
+			</mediaobject>
+			<caption>
+				SQLite Studio (PC のネイティブアプリ) で SQLite のデータベースを閲覧している例。
+				なおこれは実験用の旧データなので、本記事で紹介したものとは微妙に違う。
+			</caption>
+		</figure>
+		<p>
+			データの制約や関係についての表現力もあります。
+			たとえば存在しないアーティストを誤って参照したり、歌ったことのある歌データを誤って削除したりといったミスは、 RDBMS によって阻止されます。
+			あるいは、同名だが別実体の曲やアーティストも、完全に区別することができます。
+			それらは同じ文字列情報と別の ID を持つ、別の行に過ぎないのです。
+		</p>
+	</section>
+</section>
+
+<section xml:id="what-to-start">
+	<title>何から始めよう</title>
+
+	<section xml:id="what-to-start--almost-always-useful">
+		<title>大概のことはできる</title>
+
+		<p>
+			私のやっている例としてカラオケで歌った履歴とかいうしょーもない例を出しましたが、では実際 RDB で何を管理できるものなのでしょうか。
+		</p>
+		<p>
+			実のところ、よほど不規則なデータでもなければ基本的に RDB で管理できてしまうのです。
+		</p>
+		<blockquote>
+			<p>
+				あらゆる web サービスは、本質的には RDB のフロントエンドである。
+			</p>
+			<footer>
+				&#x2014;
+				発言者不詳
+			</footer>
+		</blockquote>
+		<p>
+			まあ「あらゆる」は言いすぎにしても、実際のところ一般人向けのサービスでデータを管理しているもののバックエンドはほとんどが RDB で実現可能でしょう。
+			文書 DB とか triplestore のようなものはまた別の話になってきますが<footnote xml:id="footnote-rdb-as-triplestore-backend" refmark-id="footnote-ref-rdb-as-triplestore-backend">
+				とはいえ triplestore のバックエンドとして RDB を使うというのも、いかにもありそうな話です。
+				それだけ RDB は強力なのです。
+			</footnote>、これらは相応に特殊な要件や注意深い設計がないと使いこなすのは難しいでしょうし、 RDB にあった都合の良い性質のいくらかが損なわれているので、初心者向けではありません。
+			あの Wikipedia で使われている MediaWiki のバックエンドさえ RDB なのですから、軽率に使うなら文書だろうが何だろうが RDB に突っ込んでしまえばいいのです。
+		</p>
+		<p>
+			ただ、それでも敢えて指標を考えるとするなら、「表を1つ以上使ってデータを並べられるなら RDB が使える」と考えるのが良いのではと思います。
+		</p>
+	</section>
+
+	<section xml:id="what-to-start--stupid-purpose">
+		<title>くだならいことに使おう</title>
+
+		<p>
+			たとえば蔵書管理に使いたいなどの需要は実にありがちです。
+			私もたいへん欲しい。
+		</p>
+		<p>
+			しかし！
+			そういうのをマトモにやろうとすると、だんだん専用アプリ (あるいはサービス) を実装している感じになってきて、最終的にソフトウェア開発っぽくなっていきます。
+			(べつにそういう欲求を無視してひたすらデータを打ち込むだけでも構わないのですが、データ入力って手間でしょう？ きっとバーコード入力とか使いたくなりますよ。)
+		</p>
+		<p>
+			そういう「みんなが欲しがりそうな重い機能」は本当に専用のサービスに任せてしまうべきです。
+			個人的にエ○セルを使って軽率にファイルを保存するくらいのノリでデータベースを作りましょう。
+			そのためには、<strong>くだらないくらいのことが手始めとして丁度良い</strong>のです。
+			たとえばカラオケの履歴とかね。
+		</p>
+	</section>
+
+	<section xml:id="what-to-start--what-to-use">
+		<title>何を使うか</title>
+
+		<p>
+			では RDB といっても何を使おうかという話です。
+			とりあえず、軽率に触るなら<strong>サーバを立てる必要のない <link xl:href="https://sqlite.org/index.html">SQLite</link></strong> が最有力の選択肢になるでしょう。
+			とはいえ SQLite はライブラリとコマンドラインツールで、直に触るには若干の PC 慣れが必要ですから、もっと楽に使うには <link xl:href="https://sqlitestudio.pl/">SQLiteStudio</link> を使いましょう。
+			<link xl:href="https://sqlitestudio.pl/index.rvt?act=gallery">ギャラリー</link>から操作画面がどのような感じか確認することができます。
+		</p>
+		<p>
+				サーバを立てたりコンテナを動かす知識と体力があるなら、 <link xl:href="https://www.mysql.com/jp/">MySQL</link> / <link xl:href="https://mariadb.com/kb/ja/mariadb/">MariaDB</link> をバックエンドにして、 <link xl:href="https://www.phpmyadmin.net/">phpMyAdmin</link> を web フロントエンドとして使うのが手頃です。
+				いずれも公式に Docker コンテナが用意されています (<link xl:href="https://hub.docker.com/_/mysql/">MySQL</link> / <link xl:href="https://hub.docker.com/_/mariadb/">MariaDB</link> / <link xl:href="https://hub.docker.com/r/phpmyadmin/phpmyadmin/">phpMyAdmin</link>) ので、環境を汚さずに試したり、ローカルで実験したデータベースをそのままサーバに持っていったりなどできます。
+				(もちろんサーバで稼動させるなら、セキュリティ設定はしっかりしましょう。)
+		</p>
+	</section>
+</section>
+
+<section xml:id="other-topics">
+	<title>その他の話題</title>
+
+	<section xml:id="other-topics--normalization">
+		<title>正規化は面倒ではない</title>
+
+		<p>
+			正規化なんて小難しい理屈が付いてますが、あんなの重複排除したい気持ちさえあれば直観でできます。
+			直観主義論理よりよほど直観的です<footnote xml:id="footnote-personal-preference-2" refmark-id="footnote-ref-personal-preference-2">
+				感想や程度には個人差がありますが、それでも正規化の方が簡単だと思います
+			</footnote>。
+		</p>
+		<p>
+			最初にスキーマを雑に作っても、テーブル定義自体の編集も後からできますから、取り返しのつかないことなんてありません。
+			SQL の表現力は強いですから、後から「アッここまとめられるじゃん」と思ったときにコンソールで SQL を入力してﾎﾟﾁｰすれば運用中の正規化くらい簡単です。
+			常時稼動かつビジネスロジックと連携する必要のある web サービスだといろいろ考えることがあるでしょうが、趣味で RDB を直接叩いているような人にとってはスキーマのダイナミックな変更くらい大したことはありません。
+		</p>
+		<p>
+			そもそも、正規化しなくてもデータは格納できるし編集もできるのです。
+			どんなに雑なスキーマを作っても (たとえば全データをひとつのテーブルに格納しても)、表計算ソフトで素朴にやるより状況が悪くなることはまずないでしょう。
+			軽率に使っていきましょう。
+		</p>
+	</section>
+
+	<section xml:id="other-topics--graphs-and-trees">
+		<title>グラフ構造と木構造もお手の物</title>
+
+		<p>
+			RDB はグラフ構造と木構造の扱いが苦手だという話がありますが、それは大昔の話なので、そのような古い情報はガン無視してください。
+			先に軽く触れましたが、最近のメジャーな OSS の RDBMS (MySQL, MariaDB, PostgreSQL, SQLite など) はどれも再帰クエリ (<code>WITH RECURSIVE</code>) に対応しています。
+			グラフ構造や木構造を表現するために非自明な工夫を凝らさずとも、自然に木構造や「関係性」そのものを扱えるようになっているのです。
+		</p>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+
+	<p>
+		RDB はいいぞ。
+		表計算ソフトの代わりに軽率にくだらない用途に使っていこうな。
+	</p>
+	<p>
+		詳しいことはググれば無限に出てくるので、やる気が出たならこんなしょーもない記事ではなくもっとマトモな情報を読んでください。
+	</p>
+</section>
+
+</article>
