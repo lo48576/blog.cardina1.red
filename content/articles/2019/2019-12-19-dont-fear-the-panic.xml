@@ -1,0 +1,1151 @@
+---
+created_at: 2019-12-16T16:27:41+09:00
+published_at: 2019-12-19T03:18:46+09:00
+format: article2019
+title: "Panic を恐れるべからず"
+tags:
+  - advent-calendar
+  - prog-rust
+kind: article
+
+excerpt: "Rust では様々な方法で panic することができるが、何をどのように使うべきだろうか。あるいはプログラムはエラーをどのように扱うべきだろうか。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2019-12-19-dont-fear-the-panic"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Panic を恐れるべからず</title>
+
+<p>
+	Rust で <code>panic!</code> や <code>assert!</code> の利用を躊躇うべきでないという話。
+	個人の見解マシマシでお送りします。
+</p>
+
+<p>
+	この記事は <link xl:href="https://qiita.com/advent-calendar/2019/rust3">Rustその3 Advent Calendar 2019</link> の18日目の記事である<footnote xml:id="footnote-published-in-utc-timezone">
+		UTC ではまだ 2019-12-18 です。許して。
+	</footnote>。
+</p>
+
+<section xml:id="tl-dr">
+	<title>TL;DR</title>
+
+	<ul>
+		<li>
+			<p>
+				不正な値の存在の存在を許してはいけない。
+				不正な値が存在できてしまう時点で、未定義動作を覚悟するくらいのつもりでいるべきである。
+			</p>
+		</li>
+		<li>
+			<p>
+				満たされるべき条件を満たさない時点で、プログラムの内部的な整合性は既に破綻しており、未定義動作も同然の状態である。
+				これ以上余計なことをする前にさっさとクラッシュせよ。
+			</p>
+		</li>
+		<li>
+			整合性破壊バグから「うまく復帰」できると思うのは甘え (極論)。
+		</li>
+	</ul>
+	<p>
+		もうちょっと詳しくは <link linkend="inconsistency-bugs-and-recoverability--should-panic-on-inconsistent-state">本題</link>、<link linkend="additional-topics--still-wondering">大雑把な指針</link>、<link linkend="conclusion">まとめ</link> を参照。
+	</p>
+</section>
+
+<section xml:id="introduction-of-panic-family">
+	<title>いろいろな panic</title>
+
+	<p>
+		Rust で panic させるにも様々な方法がある。
+		まずはそれらを見ていこう。
+	</p>
+	<dl>
+		<dt>
+			<link xl:href="https://doc.rust-lang.org/stable/std/option/enum.Option.html#method.expect"><code>Option::expect()</code></link>
+		</dt>
+		<dt>
+			<link xl:href="https://doc.rust-lang.org/stable/std/result/enum.Result.html#method.expect"><code>Result::expect()</code></link>
+		</dt>
+		<dd>
+			<p>
+				<code>self</code> が <code>Option::Some(_)></code> や <code>Result::Ok(_)</code> であればその中身の値を返し、そうでなければ<code>&amp;str</code> のメッセージを表示して <strong>panic する</strong>。
+				<code>Result</code> の場合は、エラー値のデバッグ表示も行われる。
+			</p>
+			<p>
+				<link xl:href="https://doc.rust-lang.org/stable/std/option/enum.Option.html#method.unwrap"><code>Option::unwrap()</code></link> や <link xl:href="https://doc.rust-lang.org/stable/std/result/enum.Result.html#method.unwrap"><code>Result::unwrap()</code></link> の変種だが、情報量のない既定のメッセージを表示する unwrap よりも、文脈の情報を提示できる expect を常に使うべきである。
+			</p>
+			<p>
+				<code>&amp;str</code> では固定のメッセージしか表示できないため、 <code language="rust">foo_option.unwrap(&amp;format!("Field {} not found", field_name))</code> のように <code>format</code> マクロを使う用法もありえるが、これは unwrap が成功する場合にも常に実行されてしまうため原則として避けるべきである。
+				後述の <code>unwrap_or_else()</code> の利用の方が望ましい。
+			</p>
+		</dd>
+		<dt>
+			<link xl:href="https://doc.rust-lang.org/stable/std/macro.panic.html"><code>panic!()</code></link>
+		</dt>
+		<dd>
+			<p>
+				引数をフォーマットして表示し、 <strong>panic する</strong>。
+			</p>
+			<p>
+				最も汎用的な panic 手法である。
+			</p>
+		</dd>
+		<dt>
+			<link xl:href="https://doc.rust-lang.org/stable/std/macro.unreachable.html"><code>unreachable!()</code></link>
+		</dt>
+		<dd>
+			<p>
+				unreachable である旨に加えて引数をフォーマットして表示し、 <strong>panic する</strong>。
+			</p>
+			<p>
+				到達不可能なコードであることを表現するのに使う。
+			</p>
+		</dd>
+		<dt>
+			assert 系
+		</dt>
+		<dd>
+			<p>
+				特定の条件が必ず満たされている<strong>はず</strong>であることを表現する。
+			</p>
+			<dl>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.assert.html"><code>assert!()</code></link>
+				</dt>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.debug_assert.html"><code>debug_assert!()</code></link>
+				</dt>
+				<dd>
+					<p>
+						引数に与えられた条件式が成り立つか確認する。
+						成り立たなければ、残りの引数をフォーマットして表示し、 <strong>panic する</strong>。
+					</p>
+					<p>
+						<code>debug_assert!()</code> はリリースビルドでは無効化される。
+					</p>
+				</dd>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.assert_eq.html"><code>assert_eq!()</code></link>
+				</dt>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.debug_assert_eq.html"><code>debug_assert_eq!()</code></link>
+				</dt>
+				<dd>
+					<p>
+						与えられた2つの引数が等しいか確認する。
+						等しくなければ、残りの引数をフォーマットして表示し、 <strong>panic する</strong>。
+					</p>
+					<p>
+						<code>debug_assert_eq!()</code> はリリースビルドでは無効化される。
+					</p>
+				</dd>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.assert_ne.html"><code>assert_ne!()</code></link>
+				</dt>
+				<dt>
+					<link xl:href="https://doc.rust-lang.org/stable/std/macro.debug_assert_ne.html"><code>debug_assert_ne!()</code></link>
+				</dt>
+				<dd>
+					<p>
+						与えられた2つの引数が等しくないことを確認する。
+						等しければ、残りの引数をフォーマットして表示し、 <strong>panic する</strong>。
+					</p>
+					<p>
+						<code>debug_assert_ne!()</code> はリリースビルドでは無効化される。
+					</p>
+				</dd>
+			</dl>
+		</dd>
+		<dt>
+			<link xl:href="https://doc.rust-lang.org/stable/std/option/enum.Option.html#method.unwrap_or_else"><code>Option::unwrap_or_else()</code></link> や <link xl:href="https://doc.rust-lang.org/stable/std/result/enum.Result.html#method.unwrap_or_else"><code>Result::unwrap_or_else()</code></link> と別の panic 手段の併用
+		</dt>
+		<dd>
+			<p>
+				たとえばこんな感じ: <code language="rust">foo_result.unwrap_or_else(|e| panic!("Failed to foo: {}\nbacktrace: {:?}", e, e.backtrace()))</code> 。
+				<code>expect()</code> が <code>&amp;str</code> とエラーのデバッグ表示を一緒に表示するだけという原始的なものであるため、エラーから追加で何かしらの情報を得たり整形して表示したうえで panic したいという場合にこのような手法を用いることがある。
+			</p>
+		</dd>
+	</dl>
+</section>
+
+<section xml:id="panic-means-unrecoverable-errors">
+	<title>panic は回復不可能なエラーを意味する</title>
+
+	<p>
+		Rust にはネイティブで <code>Result</code> 型によるエレガントなエラー処理機構が入っている。
+		<code>Result</code> はいくつもの都合の良い性質を持つ。
+	</p>
+	<ul>
+		<li>
+			<phrase>
+				正常終了した場合の値を取り出すのに、必ず <code>match</code> や <code>if</code> や <code>unwrap()</code> 等による検査が必要になる
+			</phrase>
+			<ul>
+				<li>
+						エラーとして返ってきた <code>NULL</code> や <code>-1</code> を誤って正常終了した結果であるかのように利用してしまう心配がない。
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>
+				<link xl:href="https://doc.rust-lang.org/edition-guide/rust-2018/error-handling-and-panics/the-question-mark-operator-for-easier-error-handling.html"><code>?</code> 演算子</link> により、エラー処理を呼び出し元へ伝播あるいは丸投げすることが可能
+			</phrase>
+			<ul>
+				<li>
+					もちろん、 <code>match</code> 等でエラー処理を行った上で改めて呼び出し元へ投げることもできる。
+				</li>
+			</ul>
+		</li>
+	</ul>
+	<p>
+		すなわち Rust のエラー処理は、 C のような戻り値による成功・失敗の返却と多言語における例外機構のような仕組みの、どちらとしても機能するようにできている<footnote xml:id="footnote-panic-can-be-implemented-by-exception">
+			内部的には panic は C++ などにおける例外機構と同様の仕組みで実装することが可能だが、内部実装はさておき、その意味するところは全く違う
+		</footnote>。
+	</p>
+	<p>
+		では panic とは一体何なのかという話だが、そもそも原則的に <strong><code>panic</code> は通常のエラー処理のための機構ではない</strong>。
+	</p>
+	<blockquote cite="https://doc.rust-lang.org/1.39.0/std/macro.panic.html">
+		<p>
+			This allows a program to terminate immediately and provide feedback to the caller of the program.
+			<strong><code>panic!</code> should be used when a program reaches an unrecoverable state</strong>.
+		</p>
+		<footer>
+			<link xl:href="https://doc.rust-lang.org/1.39.0/std/macro.panic.html"><citetitle>std::panic - Rust</citetitle> (Rust 1.39.0 リファレンス)</link>,
+			<comment>強調は引用者による</comment>
+		</footer>
+	</blockquote>
+	<p>
+		公式リファレンスにもあるように、 panic はプログラムが<strong>回復不可能な状態 (unrecoverable state)</strong> に陥ったときに発生させるべきものである。
+		通常、一般の「エラー」からは通常のプログラム状態へと復帰可能なものである (特にライブラリ自身は回復可能なエラーから復帰すべきかどうか自ら決定すべきでない) から、 panic ではなく <code>Result</code> でエラーを通知して呼び出し元に判断を委ねたり、然るべき回復処理を行うということになる。
+	</p>
+	<p>
+		逆に、「ユーザが通常状態への回復処理を行いようのないエラー」について、ライブラリが利用者にその扱いを委ねる必要がないともいえる。
+	</p>
+	<blockquote cite="https://doc.rust-lang.org/1.39.0/book/ch09-01-unrecoverable-errors-with-panic.html">
+		<p>
+			Sometimes, bad things happen in your code, and there’s nothing you can do about it.
+			In these cases, Rust has the panic! macro.
+			<quotecomment>(中略)</quotecomment>
+			This most commonly occurs <strong>when a bug of some kind has been detected and it’s not clear to the programmer how to handle the error</strong>.
+		</p>
+		<footer>
+			<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-01-unrecoverable-errors-with-panic.html"><citetitle>Unrecoverable Errors with panic! - The Rust Programming Language</citetitle> (Rust 1.39.0 TRPL)</link>,
+			<comment>強調は引用者による</comment>
+		</footer>
+	</blockquote>
+</section>
+
+<section xml:id="inconsistency">
+	<title>プログラムの不整合</title>
+	<p>
+		では、通常のエラー状態と、 panic すべき「回復不可能な状態」は何が違うのか。
+		これを考えるためには、プログラム状態の整合性<footnote xml:id="footnote-maybe-called-internal-consistency" refmark-id="footnote-ref-maybe-called-internal-consistency">
+			たぶん英語で internal consistency と呼ばれる概念だと思うのだが、未確認。
+			そのまま「内部整合性」とか「内部一貫性」と呼んで良いのだろうか？
+		</footnote>について気にしたい。
+	</p>
+
+	<p>
+		端的には、不整合とは「<strong>設計時の想定と違う状況</strong>」のことである。
+	</p>
+
+	<section xml:id="inconsistency--example-std-handling-potential-inconsistency">
+		<title>事前条件検査や不整合の std における扱い</title>
+
+		<p>
+			プログラムの各コードは (あるいは各式に至るまで) 基本的に、事前条件、事後条件、不変条件のような<strong>必ず満たされるべき条件</strong>や前提を持っている。
+			これらは暗黙であったり明示的であったり、あるいは検査されたりされなかったりする。
+			こういった条件や検査が std ライブラリでどのように行われているか、いくつか例を挙げる。
+		</p>
+		<ul>
+			<li>
+				<p>
+					条件: <link xl:href="https://doc.rust-lang.org/stable/std/primitive.str.html"><code>&amp;str</code></link> が参照するスライスは妥当な UTF-8 バイト列である。
+				</p>
+				<ul>
+					<li>
+						<p>
+							この条件は <link xl:href="https://doc.rust-lang.org/stable/std/str/fn.from_utf8.html"><code>std::str::from_utf8</code></link> などによる <code>&amp;str</code> の作成時に検査される。
+							また、 <code>&amp;mut str</code> 経由で行われる safe な操作でも検査されるか、そもそも条件が破壊されない操作しか許可されていない。
+						</p>
+					</li>
+					<li>
+						<p>
+							<link xl:href="https://doc.rust-lang.org/stable/std/str/fn.from_utf8_unchecked.html"><code>std::str::from_utf8_unchecked</code></link> などは<strong>検査を行わないため <code>unsafe</code> 関数である</strong>。
+						</p>
+						<blockquote cite="https://doc.rust-lang.org/1.39.0/std/str/fn.from_utf8_unchecked.html#safety">
+							<p>
+								This function is unsafe because it does not check that the bytes passed to it are valid UTF-8.
+								<strong>If this constraint is violated, undefined behavior results</strong>, as the rest of Rust assumes that <code>&amp;str</code>s are valid UTF-8.
+							</p>
+							<footer>
+								<link xl:href="https://doc.rust-lang.org/1.39.0/std/str/fn.from_utf8_unchecked.html#safety"><citetitle>std::str::from_utf8_unchecked - Rust</citetitle> (1.39.0)</link>,
+								<comment>強調は引用者による</comment>
+							</footer>
+						</blockquote>
+						<p>
+							また、 <code>&amp;mut str</code> 経由で行われる unsafe な操作では、事前条件を満たさない使い方をした場合、危険な結果を生む。
+						</p>
+						<blockquote cite="https://doc.rust-lang.org/1.39.0/std/primitive.str.html#safety-1">
+							<p>
+								Failing that, the returned string slice <strong>may reference invalid memory</strong> or <strong>violate the invariants communicated by the <code>str</code> type</strong>.
+							</p>
+							<footer>
+								<link xl:href="https://doc.rust-lang.org/1.39.0/std/primitive.str.html#safety-1"><citetitle>str - Rust</citetitle> (1.39.0)</link>,
+								<comment>強調は引用者による</comment>
+							</footer>
+						</blockquote>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					条件: <link xl:href="https://doc.rust-lang.org/stable/std/num/struct.NonZeroUsize.html"><code>std::num::NonZeroUsize</code></link> は非ゼロの値を持つ。
+				</p>
+				<ul>
+					<li>
+						<p>
+							この条件は <link xl:href="https://doc.rust-lang.org/stable/std/num/struct.NonZeroUsize.html#method.new"><code>NonZeroUsize::new</code></link> などによる <code>NonZeroUsize</code> の作成時に検査される。
+						</p>
+					</li>
+					<li>
+						<p>
+							<link xl:href="https://doc.rust-lang.org/stable/std/num/struct.NonZeroUsize.html#method.new_unchecked"><code>NonZeroUsize::new_unchecked</code></link> による <code>NonZeroUsize</code> の作成では<strong>検査を行わないため <code>unsafe</code> 関数である</strong>。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					条件: 参照 (<code>&amp;T</code>) は生存しているオブジェクトを指す。
+				</p>
+				<ul>
+					<li>
+						<p>
+							この条件は <code>&amp;val</code> のような形での参照の作成では、コンパイラによって検査される。
+						</p>
+					</li>
+					<li>
+						<p>
+							<code>unsafe { &amp;*ptr }</code> (なお <code>ptr</code> はポインタとする) のような形での参照の作成では、 <code>ptr</code> の指す値が参照より長く生存していることを、実装者が保証する必要がある。
+							保証が破られた場合、未定義動作となる。
+						</p>
+					</li>
+				</ul>
+			</li>
+		</ul>
+		<p>
+			他にも 「<link xl:href="https://doc.rust-lang.org/stable/std/char/fn.from_u32_unchecked.html"><code>char</code> は有効な Unicode コードポイントを持つ</link>」や「<link xl:href="https://doc.rust-lang.org/stable/std/cell/index.html"><code>RefCell</code> の中身の借用は参照と同じ規則に従う</link>」など、多数の型や機能について「満たしていなければならない条件」が設定されている。
+				それらの保証の方法は概ね次のように分類できる。
+		</p>
+		<ul>
+			<li>
+				<phrase>
+					コンパイラが検査する。
+					検査が通らなければ<strong>コンパイルエラー</strong>。
+				</phrase>
+				<ul>
+					<li>
+						参照の生存期間、値のスレッド間共有・転送の許可など
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					保証を呼び出し元に一任する <strong><code>unsafe</code> 関数</strong>として、呼び出される関数での検査を行わない。
+				</phrase>
+				<ul>
+					<li>
+						<code>std::str::from_utf8_unchecked</code> や <code>std::num::NonZeroUsize::new_unchecked</code> など
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					処理の時点で検査する。
+					検査が通らなければ<strong>エラーや <code>Option</code> を返す</strong>。
+				</phrase>
+				<ul>
+					<li>
+						<code>std::str::from_utf8</code> (エラーを返す) や <code>std::num::NonZeroUsize::new</code> (<code>Option</code> を返す)、 <code>&lt;[T]&gt;::get</code> など
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					処理の時点で検査する。
+					検査が通らなければ <strong>panic する</strong>。
+				</phrase>
+				<ul>
+					<li>
+						<code>std::cell::RefCell::replace</code> や <code>std::sync::Mutex::lock</code> 、 <code>[T]</code> 型の <code>[]</code> 演算子など
+					</li>
+				</ul>
+			</li>
+		</ul>
+	</section>
+
+	<section xml:id="inconsistency--inconsistency-should-not-be-allowed">
+		<title>不整合の存在は許されない</title>
+
+		<p>
+			さて、こういった検査の徹底によって、<strong>safe なコードでは整合性の破壊された不正な値は存在を許されていない</strong>といえる。
+			また、不正な値の作成を含め <strong>不正な処理の実行は許されていない (阻止される)</strong>。
+		</p>
+		<ul>
+			<li>
+				<phrase>
+					コンパイルエラー
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							コンパイルが通らないため、不正な処理は実行されない。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					値の作成でエラーや <code>None</code> を返す
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							このとき不正な値は呼び出し元の手に渡ることがない。
+							よって (もし仮に内部で一時的に不正な値が存在していたとしても) ユーザに不正な値は見えず、扱うこともできない。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					panic する
+				</phrase>
+				<ul>
+					<li>
+						<p>
+							コードの実行はここで中断される。
+							そのため、何らかの正当な値や状態を期待した続くコードが、不正な値や不正な状態とともに実行されることはない。
+						</p>
+					</li>
+				</ul>
+			</li>
+		</ul>
+		<tip xml:id="rejecting-invalid-value-by-exception">
+			<title>例外機構で不正な値の存在を拒否する言語</title>
+			<p>
+				C++ などにおいては、コンストラクタ等で値の作成の続行が不可能になった場合、例外によって脱出することが推奨されている。
+				これも、「不正な値が存在、あるいはユーザの手に渡ることを許さない」という原則を強制するための機構であると捉えられる
+				<footnote xml:id="footnote-incomplete-raii-in-cpp" refmark-id="footnote-ref-incomplete-raii-in-cpp">
+					歴史的経緯によるものか言語仕様ゆえか、 C++ におけるこの規約の徹底は不完全というか、ユルい。
+					たとえば Rust の <link xl:href="https://doc.rust-lang.org/stable/std/fs/struct.File.html"><code>File</code></link> は必ず開いた状態であるが、 C++ の <link xl:href="https://en.cppreference.com/w/cpp/io/basic_fstream"><code>fstream</code></link> は「閉じた状態」 (つまりストリームとして機能しない状態) が存在できてしまうし、 Rust の <link xl:href="https://doc.rust-lang.org/stable/std/boxed/struct.Box.html"><code>Box</code></link> は必ず有効な値を参照するが、 <link xl:href="https://en.cppreference.com/w/cpp/memory/unique_ptr"><code>unique_ptr</code></link> は「何も指さない」 (つまり <code>nullptr</code> を持つ) ことができてしまう。
+				</footnote>。
+			</p>
+		</tip>
+		<p>
+			では <code>unsafe</code> でマークされたコードはどうかといえば、これはコンパイラによる検査は行われないが、開発者 (呼び出し元コード) が期待される条件を満たすことを保証する義務を負う。
+			unsafe なコードで条件破りを行った場合、そのようなコードは未定義動作となる。
+			すなわち、メモリ破壊などと同程度に危険のリスクを負うことになる。
+		</p>
+		<p>
+			unsafe は「整合性を破れる場所」ではなく「整合性検査をコンパイラでなく人間が行わなれけばならない場所」であることを肝に命じなければならない。
+		</p>
+		<tip xml:id="ub-even-if-inconsistency-is-transient">
+			<title>整合性破壊は、一時的であっても即時に未定義動作を引き起こすことがある</title>
+
+			<p>
+				unsafe ブロックや unsafe 関数中で発生してしまった不正な値を、外に持ち出す前に検査して弾ければ良いと思うだろうか？
+				残念ながらそれは甘い。
+			</p>
+			<blockquote cite="https://github.com/rust-lang/rust/issues/53491#issuecomment-494486596">
+				<p>
+					So the answer I think we should be giving is that every assignment (really every copy, as in, every assignment after lowering to MIR) is a use, and that includes the assignment in <code>let x: bool = mem::uninitialized()</code>.
+				</p>
+				<footer>
+					&#x2014;
+					<attribution>@RalfJung</attribution>,
+					<pubdate><time datetime="2019-05-21T17:35Z">2019-05-21 (UTC)</time></pubdate>,
+					<link xl:href="https://github.com/rust-lang/rust/issues/53491#issuecomment-494486596"><citetitle>Tracking issue for RFC 1892, "Deprecate uninitialized in favor of a new MaybeUninit type" · Issue #53491 · rust-lang/rust</citetitle></link>
+				</footer>
+			</blockquote>
+			<p>
+				<code>MaybeUninit</code> の tracking issue によれば、 <code>let x: bool = std::mem::uninitialized();</code> と書いた瞬間にこれは未定義動作を引き起こし<footnote xml:id="footnote-ub-by-uninitialized-bool-and-llvm" refmark-id="footnote-ref-ub-by-uninitialized-bool-and-llvm">
+					<link xl:href="https://github.com/rust-lang/rust/issues/53491#issuecomment-494369291">LLVM に対して値が boolean であると伝える中間表現を吐く</link>ため LLVM 側も <code>false</code> と <code>true</code> 以外の値が来ないことを想定した処理を行うが、 uninitialized な値はこの LLVM の想定を (たとえそれ以降で値を使わずとも) 破るとのこと
+				</footnote>、以降のプログラムの動作に一切の保証がなくなる。
+				<code>bool</code> の値を <code>uninitialized()</code> で作ろうとした時点で既に手遅れなので、その後でどう検査をしようがそんなものは全く無意味である。
+			</p>
+			<p>
+				unsafe の闇は、人々が考えているよりもずっと深い。
+			</p>
+		</tip>
+	</section>
+
+	<section xml:id="inconsistency--generic-case">
+		<title>その他一般的な不整合</title>
+
+		<p>
+			不整合は標準ライブラリでだけ発生するものではない。
+			正常な動作を行うために必要な条件が破れるのも不整合だし、コードが保証しようとした性質が満たされなくなるのも不整合である。
+		</p>
+		<p>
+			例として、 safe な双方向連結リストを提供するライブラリを考えよう。
+			<code>Vec</code> はノード型を持っており、各ノードは要素 (値) と前後要素のインデックスを持っているとする。
+		</p>
+		<programlisting language="rust"><![CDATA[// 想定: フィールドは外部から変更されない。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct NodeIndex(usize);
+
+// 想定: フィールドは外部から変更されない。
+// 想定: Option<NodeIndex> に対する safe な操作は未定義動作を引き起こさない。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    // 想定: data は不正な値ではない。
+    data: T,
+    next: Option<NodeIndex>,
+    prev: Option<NodeIndex>,
+}
+
+// 想定: フィールドは外部から変更されない。
+// 想定: Vec<Node<T>> と Option<NodeIndex> に対する safe な操作は未定義動作を引き起こさない。
+#[derive(Default, Debug, Clone)]
+struct SafeLinkedList<T> {
+    nodes: Vec<Node<T>>,
+    first: Option<NodeIndex>,
+    last: Option<NodeIndex>,
+}
+
+impl<T: Clone> SafeLinkedList<T> {
+    pub fn push_back(&self, val: T) -> NodeIndex {
+        let new_index = NodeIndex(self.arena.len());
+        // 想定: push された要素のインデックスは new_index.i である。
+        self.arena.push(Node {
+            data: val,
+            // 保証したい条件0: 最後尾ノードの next は None である。
+            next: None,
+            // 想定: リストがノードを持つとき self.last は Some であり、ノードを持たないとき None である。
+            // 保証したい条件1: 新しいノードの前のノードは、最後尾だったノードである。
+            // 保証したい条件2: prev->next と next->prev でノードを参照すると、元のノードに戻ってくる。
+            prev: self.last,
+        });
+        // 想定: リストがノードを持つとき self.last は Some であり、ノードを持たないとき None である。
+        if let Some(last) = self.last {
+            // 保証したい条件3: 最後尾だったノードの次のノードが、新しいノードである。
+            // 保証したい条件2: prev->next と next->prev でノードを参照すると、元のノードに戻ってくる。
+            // 想定: last は arena の要素を指す妥当なインデックスである。
+            self.arena
+                .get_mut(last)
+                .expect("Should never fail: the last element must be in the arena")
+                .next = Some(new_index);
+        } else {
+            // 想定: self.last が `None` だったとき、 self.first も `None` である。
+            self.first = Some(new_index);
+            self.last = Some(new_index);
+        }
+    }
+
+    pub fn get(&self, i: NodeIndex) -> &T {
+        // 想定: i は (他の SafeLinkedList ではなく) self によって作られたものである。
+        // 想定: i は self.push_back() で作成されて以降、ユーザによって中身を不正に改変されていない。
+        // 想定: i は self.push_back() で作成されて以降、 SafeLinkedList によって中身を変更されていない。
+        // 想定: i が self.push_back() で作成されて以降、 self.arena から i 番目のノードは削除されていない。
+        &self.nodes[i.0]
+    }
+}]]></programlisting>
+		<p>
+			単純なコードではあるが、保証したい条件や、成り立つと暗黙に想定している条件 (つまりコードが正しく動くために必要な前提) はこのように多く存在していることがわかる。
+			ある条件は安全なメモリアクセスに必要だし、ある条件はデータ構造を破壊せず意味のある値を返すために必要だし、ある条件は開発者の意図に反した panic が発生しないために必要である。
+			また、保証したい条件も、ユーザやライブラリ内部が想定している条件を常に満たすために必要なものである。
+			<strong>こうした多くの条件のひとつでも破れればそれは不整合</strong>である。
+			整合性を失ったプログラムは未定義動作に突入したり、 panic したり、あるいは誤った値や不正な値を返したりなど、不正な処理をすることになるだろう。
+		</p>
+	</section>
+</section>
+
+<section xml:id="inconsistency-bugs-and-recoverability">
+	<title>不整合、バグ、回復可能性</title>
+
+	<section xml:id="inconsistency-bugs-and-recoverability--unrecoverable-from-inconsistency">
+		<title>不整合からの回復の試みは一般に無意味</title>
+
+		<p>
+			そもそも開発者やユーザが想定していない状態である不整合からは、実行時に回復を考えることに意味がない。
+			何故なら、ひとつでも前提が破れていることに気付いた時点で、その実は成り立っていない条件を根拠に正しく動く他の部分のコードも、誤った動作をしているかもしれないためである。
+			更に、そういった誤った条件に基く動作は、保証したかったはずの他の条件まで連鎖的に破っていくかもしれない。
+			壊れた状態を無理矢理に解釈して情報を復元しようにも、気付いた箇所以外にも不整合が発生していることが考えられるため、何も想定を持つことができないし、そもそも復帰しようとして集めた情報が正しいという保証もないということである。
+		</p>
+		<p>
+			また、<strong>不整合に気付いた時点で既に誤りは予想できない範囲まで伝播している</strong><footnote xml:id="footnote-inconsistency-cannot-be-recognized-immediately" refmark-id="footnote-ref-inconsistency-cannot-be-recognized-immediately">
+				誤りが発生した瞬間に気付くというのは、まずありえない。
+				何故ならそれは「どこにバグがあるか知っていながらそれを修正せず実行した」ということに他ならないからである。
+				検出した不整合を復元するロジックを書けるなら、当然それはバグの直後に挿入されるべきであり、もっと言えばバグ自体が修正されているべきである。
+				逆に言えば、発生した誤りは必ず見逃され他の場所へ伝播すると考えられる。
+			</footnote>ことがありえる。
+			つまり、プログラムが不整合状態になったとき、プログラムは全体として既に想定を満たさない状態で動いている可能性があり、その結果として発生する処理やデータも基本的に無意味である<footnote xml:id="footnote-scoped-inconsistency" refmark-id="footnote-ref-scoped-inconsistency">
+				不整合が限られた場所に封じ込められていれば、プログラムが部分的に「意味ある挙動」をしていると考えても良いかもしれない。
+				しかしこれは「(不整合に気付いてからではなく) 不整合が発生してから、そのコードから生じた一切のデータがプログラムの挙動や判断に影響を与えていないと確信できる場合のみに意味がある。
+				そのような「メインの処理に一切の有意義な情報を与えない極めて独立したコード」というのは、実用上ありえるが、かなり限定的である。
+			</footnote>。
+			その無意味な処理で無意味なデータを解釈して「復帰」しようとする行為も、当然無意味である。
+		</p>
+	</section>
+
+	<section xml:id="inconsistency-bugs-and-recoverability--inconsistency-is-a-bug">
+		<title>不整合はバグである</title>
+
+		<p>
+			整合性破壊はバグ (semantic error) である。
+			このようなバグこそ、 The Rust Programming Language で言われている <quote lang="en"><qp>“</qp>a bug of some kind<qp>”</qp></quote> であると考えるべきである。
+		</p>
+		<blockquote cite="https://doc.rust-lang.org/1.39.0/book/ch09-01-unrecoverable-errors-with-panic.html">
+			<p>
+				Sometimes, bad things happen in your code, and there’s nothing you can do about it.
+				In these cases, Rust has the panic! macro.
+				<quotecomment>(中略)</quotecomment>
+				This most commonly occurs <strong>when a bug of some kind has been detected</strong> and it’s not clear to the programmer how to handle the error.
+			</p>
+			<footer>
+				<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-01-unrecoverable-errors-with-panic.html"><citetitle>Unrecoverable Errors with panic! - The Rust Programming Language</citetitle> (Rust 1.39.0 TRPL)</link>,
+				<comment>強調は引用者による</comment>
+			</footer>
+		</blockquote>
+	</section>
+
+	<section xml:id="inconsistency-bugs-and-recoverability--should-panic-on-inconsistent-state">
+		<title>不整合を検出したとき、プログラムは panic すべきである</title>
+
+		<p>
+			さて、やっとこの記事の本題である。
+		</p>
+		<p>
+			プログラムは、<strong>不整合を検出したとき panic すべきである</strong>。
+		</p>
+		<p>
+			これまでの説明を踏まえれば簡単な話で、「不整合に気付いたとき、不整合に基く誤った値や状態は既に他へ伝播している可能性が高いため、回復は基本的に不可能で、これ以上何をしても無意味な行為や破壊行為しかできない」ということである。
+			傷口を広げないために、そのような修復不可能な不整合に気付き次第、プログラムは速やかに異常終了してこれ以上の破壊を阻止するしかない。
+			<strong>プログラムが不正な状態で実行を継続すべきではない</strong>。
+		</p>
+		<blockquote cite="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html">
+			<p>
+				The <code>panic!</code> macro signals that <strong>your program is in a state it can’t handle</strong> and lets you tell the process to stop <strong>instead of trying to proceed with invalid or incorrect values</strong>.
+			</p>
+			<footer>
+				<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html"><citetitle>To panic! or Not To panic! - The Rust Programming Language</citetitle> (Rust 1.39.0 TRPL)</link>,
+				<comment>強調は引用者による</comment>
+			</footer>
+		</blockquote>
+	</section>
+</section>
+
+<section xml:id="usage">
+	<title>panic の使い方</title>
+
+	<p>
+		以下での説明には筆者の個人的な考えが多分に含まれることに留意されたい。
+	</p>
+
+	<section xml:id="usage--where-to-use-which">
+		<title>どこで何を使うべきか</title>
+		<p>
+			冒頭でさまざまな panic の方法を挙げたが、どれをどこで使うべきか。
+			名前から明らかといえば明らかだが、筆者の個人的な考えも含めて解説する。
+		</p>
+		<dl>
+			<dt>
+				<phrase>
+					<code>assert</code> 系
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					「満たしていることを保証したい条件」や「満たされていることを保証したい条件」が満たされていることを可視化・検査するのに用いる。
+					たとえば事前条件、事後条件、不変条件などである。
+				</p>
+				<p>
+					assert 失敗時のメッセージを必ず用意しておくこと。
+				</p>
+			</dd>
+			<dt>
+				<phrase>
+					<code>debug_assert</code> 系
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					コストの高い検査に用いる。
+				</p>
+				<p>
+					また、どう考えても成り立つ条件や、ちょっと前に既に検査済みの条件を、念のため書いておくのにも用いる (後述)。
+				</p>
+				<p>
+					assert 失敗時のメッセージを必ず用意しておくこと。
+				</p>
+			</dd>
+			<dt>
+				<phrase>
+					<code>unreachable!</code>
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					到達不可能な場所で使う。
+				</p>
+				<p>
+					また、 <code>unwrap_or_else</code> と組み合わせて使うこともできる。
+					主に、固定でないメッセージとともに panic したいときに有用。
+				</p>
+				<programlisting language="rust"><![CDATA[dict.get(key)
+    .unwrap_or_else(|| unreachable!("`dict` should have an entry for the key {:?}", key))]]></programlisting>
+			</dd>
+			<dt>
+				<phrase>
+					<code>unwrap()</code>
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					使ってはいけない<footnote xml:id="footnote-using-unwrap-in-tests">
+						テストであったり doctest (doc comment 中に書かれたテスト) 中で使う分には便利。
+						こういったテストは確信の表明というよりは「こうあるべきである」という仕様の表明なので、説明が既に近くに存在しているケースが多く、メッセージが冗長になりがち。
+					</footnote>。
+					<code>expect()</code> を使うべし。
+				</p>
+			</dd>
+			<dt>
+				<phrase>
+					<code>expect()</code>
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					<code>Result</code> や <code>Option</code> が <code>Ok</code> や <code>Some</code> である確信があるときに使う。
+						説明のメッセージを動的に生成したい場合は、代わりに <code>.unwrap_or_else()</code> などを合わせて使う。
+				</p>
+			</dd>
+			<dt>
+				<phrase>
+					<code>panic!</code>
+				</phrase>
+			</dt>
+			<dd>
+				<p>
+					汎用。
+					他がいずれも適していないと思ったとき使う。
+				</p>
+			</dd>
+		</dl>
+
+		<section xml:id="usage--where-to-use-which--just-to-be-sure">
+			<title>「念のためもう一回 assert」</title>
+
+			<p>
+				assert は、「その場で成り立つ条件」を表明するものである。
+				つまり、同じ不変条件であっても、別々の場所で表明することには価値がある。
+			</p>
+			<programlisting language="rust"><![CDATA[fn foo(mut v: Foo) {
+    assert!(some_condition_holds(v), "Some condition should hold for {:?}", v);
+    // Do complex processing here.
+    // Do more complex processing here.
+    // Complex processing done.
+
+    // It seems obvious for now...
+    // でも念のためもう一回検査しとく
+    debug_assert!(some_condition_holds(v), "Some condition should still hold for {:?}", v);
+    // Do another processing.
+}]]></programlisting>
+			<p>
+				また、開発初期にそのような条件が持続することが自明に見えても、コードが膨らんでいくにつれ、間に多くの処理が挟まるかもしれない。
+				そのとき、追加・変更された全てのコードがまだ先に確認した条件を壊さないと、本当に確信できるだろうか？
+				こういった検査は、不完全な人の目だけによらず、 assert で機械的に検査するのが安全である。
+			</p>
+		</section>
+
+		<section xml:id="usage--where-to-use-which--with-unsafe-block">
+			<title>unsafe ブロックのお供に</title>
+
+			<p>
+				unsafe な処理は、何らかの条件を検査なしに前提として受け入れるようなものが多い。
+				そういった unsafe な処理は基本的に、要求される条件を満たす確信のある場面でしか使われない。
+				しかし検査がないと、もし何かの事故 (バグ) で条件が不成立だった場合、発覚が非常に遅れる可能性がある。
+				そこで <code>debug_assert</code> 系が便利。
+			</p>
+			<programlisting language="rust"><![CDATA[unsafe {
+    // I'm pretty sure `i` is positive (and nonzero).
+    debug_assert!(i > 0_isize);
+    NonZeroUsize::new_unchecked(i)
+}]]></programlisting>
+			<p>
+				<code>debug_assert</code> 系はリリースビルドでは消えるので、パフォーマンスが重要な場面で問題になることはない。
+				また、そもそもデバッグビルドはデバッグしやすさを前提にしており非常に遅い (たとえば加算にいちいちオーバーフロー検査が入ったりする！) ため、安全性の検査のための多少の追加コストは許容されるだろう。
+			</p>
+		</section>
+	</section>
+
+	<section xml:id="usage--disabling-assert-should-not-change-expected-behaviour">
+		<title>assert の無効化は期待されるコードの挙動を変えるべきでない</title>
+
+		<p>
+			これも筆者の個人的な考えだが、<strong>assert の有無は、期待されるコードの挙動を変えるべきでない</strong>。
+			つまり、あらゆる assert は、<strong>プログラムが完全に想定 (仕様) 通りに動いたとするなら</strong>全く存在しなくても構わないように使うべきである。
+		</p>
+		<programlisting language="rust"><![CDATA[pub struct Id(NonZeroU32);
+
+impl Id {
+    /// Creates a new ID from the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given value is larger than or equal to `std::u32::MAX`.
+    pub fn from_index(index: usize) -> Self {
+        assert!(index < std::u32::MAX); // <- This assert should never be removed!
+        Self(unsafe {
+            NonZeroU32::new_unchecked(index + 1)
+        })
+    }
+}]]></programlisting>
+		<p>
+			この assert は「<code>std::u32::MAX</code> 以上の値を渡されたら panic する」という仕様を実現するために必須のコードとなっている。
+			仕様ということはすなわちそのような大きな値が渡されることも想定内であり、そこで panic するのは期待される挙動ということになる。
+			こういった場面で、省略不可能な形で assert を使うのは危険ではないかと、私は思うわけである。
+		</p>
+		<p>
+			assert は名前の通り何事かを主張する、あるいはそのはずであると断言することであって、「条件が満たされなかったら panic」というのはその結果に過ぎず本来の目的ではないと考えるべきである。
+			つまり「検査なんかなくても最初から成り立ってるはずなんだけど念のため言っとくと、この条件が成り立つよ」というくらいの気持ちで使うものである。
+			assert は不整合状態を防ぐ安全性確保のためのストッパーであり、となれば、単に実行フローを制御するための if 文のように使うべきではないのではないだろうか。
+		</p>
+		<p>
+			<code>assert</code> を常に省略可能に保つことは、 <code>debug_assert</code> との切り替えを安全にするという意味でも有用である。
+		</p>
+		<p>
+			<link linkend="usage--where-to-use-which--just-to-be-sure">先のセクション</link>で述べた例のように、同じ条件を近い場所で複数回検査したいということがあるかもしれない。
+			ある <code>assert</code> の手前に同じ条件を検査する <code>assert</code> を挿入したとき、後続の <code>assert</code> を <code>debug_assert</code> に置き換えたいという欲求が生じるかもしれない。
+			あるいは、開発初期には assert で検査する条件が単純だったが、開発が進むにつれ条件の計算が重くなり、リリースビルドで何度も実行したくなくなるかもしれない。
+			assert 系マクロの無効化が期待される挙動に影響を与えないという確信を持っていれば、このような切り替えを躊躇なく、エンバグしないという確信を持って行うことができる。
+		</p>
+	</section>
+</section>
+
+<section xml:id="dont-wanna-panic-on-server">
+	<title>「サーバでは panicしたく ないんです」 #n575</title>
+	<p>
+		サーバだからといって、不整合がプログラム全体へ伝播していないと思えるなどということがあろうか？
+		そんなことはない。
+		不整合に気付いたら panic すべきである。
+	</p>
+	<p>
+		……と筆者は思うわけだが、そうはいっても panic したくない、サーバは panic するべからず、という思想を持つ人々もいるらしい。
+		そこで妥協案として、 mutex と thread を使うという方法がある。
+	</p>
+
+	<section xml:id="dont-wanna-panic-on-server--using-thread">
+		<title>thread で panic を検知する</title>
+
+		<blockquote cite="https://doc.rust-lang.org/1.39.0/std/thread/index.html#the-threading-model">
+			<p>
+				If the panic is not caught the thread will exit, but the panic may optionally be detected from a different thread with <code>join</code>.
+				If the main thread panics without the panic being caught, the application will exit with a non-zero exit code.
+			</p>
+			<footer>
+				<link xl:href="https://doc.rust-lang.org/1.39.0/std/thread/index.html#the-threading-model"><citetitle>std::thread - Rust</citetitle> (1.39.0)</link>
+			</footer>
+		</blockquote>
+		<p>
+			メインスレッド以外が panic して、 <code>catch_unwind</code> でキャッチされず、かつ panic で即座に abort する設定になっていなかった場合、スレッドの panic を別スレッドから (<link xl:href="https://doc.rust-lang.org/stable/std/thread/struct.JoinHandle.html"><code>JoinHandle</code></link> を通じて) 検知することができる。
+		</p>
+		<p>
+			もちろんこの場合にも、 panic 以前に既にスレッドは不整合状態になっていたし、その状態での出力や処理は信用できたものではない。
+			が、たとえばサーバが新規コネクションを受け付けるスレッドと個々のクライアントへの応対を行うスレッドを別々に持っており、かつスレッド間での通信が極めて限定されているか行われていないなどの場合であれば、クライアント応対のスレッドが落ちても新規コネクション受け付け処理は依然として整合のとれた状態で稼動しているという保証をすることはできるかもしれない。
+		</p>
+		<p>
+			すべては「不整合が漏れ出していないことを確信できるか」次第である。
+		</p>
+	</section>
+
+	<section xml:id="dont-wanna-panic-on-server--using-mutex">
+		<title>mutex で panic 由来の潜在的な不整合を扱う</title>
+
+		<p>
+			また、 thread と panic に関連した mutex の面白い機能として、 mutex を書き込み可能な状態で lock していたスレッドが panic したとき、 mutex は <link xl:href="https://doc.rust-lang.org/1.39.0/std/thread/index.html#the-threading-model">poisoned (汚染された) 状態</link>になる。
+			これは、壊れているかもしれないデータに、壊れているかもしれないと想定しているコードのみがアクセスできるようにする仕組みである。
+		</p>
+		<p>
+			データ更新の途中でスレッドが panic した場合など、更新が未完了のままのデータが mutex に残されてしまうことがありえる。
+			panic したスレッドから見れば、 panic 以降で基本的に不整合のデータで困るような処理は行われないため問題はない。
+			しかし、外部のスレッドがその中途半端な状態を観測できた場合、不整合状態のデータを観測してしまうリスクがある。
+			そこで、このようなとき mutex はデータが poisoned であるとしてエラー状態の一部として扱うことで、「不整合の可能性があると認識したコードにしかデータを触らせない」という形で不整合の意図せぬ伝播を阻止しているのである。
+		</p>
+	</section>
+</section>
+
+<section xml:id="additional-topics">
+	<title>その他の話題</title>
+
+	<section xml:id="additional-topics--ensure-macros">
+		<title><code>ensure!</code> マクロ</title>
+
+		<p>
+			エラーハンドリングを支援する crate には、 <code>ensure!</code> マクロを提供するものがある<footnote xml:id="footnote-ensure-macros" refmark-id="footnote-ref-ensure-macros">
+				たとえば <link xl:href="https://docs.rs/failure/0.1.6/failure/macro.ensure.html">failure crate</link> や <link xl:href="https://docs.rs/anyhow/1.0.25/anyhow/macro.ensure.html">anyhow crate</link> など。
+			</footnote>。
+			これは assert と同様に与えられた条件が満たされているか検査するが、満たされていなかった場合に panic するのではなく与えられたエラーを返すというマクロであり、これこそ、仕様の一部として実行フローの制御に使うことのできる assert である。
+		</p>
+		<p>
+			ただし、このマクロは事前条件を満たさない引数などの通知には使えるが、整合性検査ではあまり使うべきではない点には留意すべきである。
+			基本的に整合性エラーが起きた時点でライブラリのユーザに取れるアクション (取って意味のあるアクション) はほとんどないため、ユーザにそのような不整合を無視させる選択肢を与えるべきでない。
+		</p>
+		<p>
+			たとえば「有向非巡回グラフだと思ってたのにいつのまにか循環が入ってました！」などとエラーで報告されても、ユーザに打つ手はないし、何事もなかったかのように無視させてはいけない。
+			こういった不整合の検出は、再三述べたように <code>Result</code> ではなく panic によって通知されるべきだ。
+		</p>
+	</section>
+
+	<section xml:id="additional-topics--dont-unwrap">
+		<title>「<code>unwrap()</code> するな」</title>
+
+		<p>
+			<code>unwrap()</code> を使うなというのは、文字通りに解釈すれば確かにその通りである。
+			テストや書き捨てるコードを除き、ほぼすべての場合において <code>unwrap()</code> よりも <code>expect()</code> が優先されるべきである。
+		</p>
+		<p>
+			では「<code>expect()</code> するな」というのが常に言えるかといえば、私はそうは思わない。
+			何らかの値が <code>Some</code> や <code>Ok</code> であることを当然に期待できる状況というのは、現実的に存在する。
+		</p>
+		<programlisting language="rust"><![CDATA[fn hoge(&mut self) -> &Node {
+    let child = self.generate_child();
+    self.last_child = Some(child);
+    // self にいろいろな処理
+    // self にもっといろいろな処理
+    // いろいろな処理が終了
+
+    // last child への参照を返す
+    // self.last_child は `None` にされていない確信がある
+    self.last_child
+        .as_ref()
+        .expect("Should never fail: previously set to `Some`")
+}]]></programlisting>
+		<p>
+			このように <code>expect()</code> を使えばシンプルに assert 相当の確信を表明できるところで、わざわざ match と panic を使うべきだろうか？
+		</p>
+		<programlisting language="rust"><![CDATA[    // last child への参照を返す
+    // self.last_child は `None` にされていない確信がある
+    match self.last_child {
+        Some(v) => v,
+        None => panic!("Should never fail: previously set to `Some`"),
+    }]]></programlisting>
+		<p>
+			何かが良くなったとは思えない。
+		</p>
+	</section>
+
+	<section xml:id="additional-topics--still-wondering">
+		<title>それでもまだ悩んだら</title>
+
+		<ul>
+			<li>
+				<p>
+					<strong>プログラムが完全に掌握しているはずのデータが誤っていれば、 panic</strong> せよ
+				</p>
+				<ul>
+					<li>
+						<p>
+							大抵の場合、プログラムのロジックが壊れている。
+							壊れたロジックと壊れた状態をもとに、プログラムが正しく動作できるわけはないし、ユーザにできることもない。
+							さっさと異常終了すべきである。
+						</p>
+						<p>
+							「ライブラリのユーザ (つまり開発者) がドキュメントを読んでねえのが悪いだろ」などもこれに含む。
+							(<code>NonZeroUsize::new</code> に 0 を渡すなど。)
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					プログラムの<strong>バグが原因なら、 panic</strong> せよ
+				</p>
+				<ul>
+					<li>
+						<p>
+							「バグがなければ起きないはず」の状況が起きたとき、プログラムは既にバグを踏み抜いた後である。
+							プログラムは不整合状態に突入しており、以降の一切の実行は信頼できない。
+							さっさと異常終了すべきである。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					<strong>環境や外部データに問題があるなら <code>Result</code> を返す</strong>べし
+				</p>
+				<ul>
+					<li>
+						<p>
+							プログラムは、自身の完全な制御下にないデータを警戒する義務がある。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					<strong>エンドユーザに問題があるなら <code>Result</code> を返す</strong>べし
+				</p>
+				<ul>
+					<li>
+						<p>
+							エンドユーザは、プログラムの完全な制御下にないため、当然、不正な操作の拒否を仕様に含むべきである。
+						</p>
+						<p>
+							エンドユーザは環境や外部データの一部であるともいえる。
+						</p>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<p>
+					<strong>ありえないことが起きたなら panic</strong> せよ
+				</p>
+				<ul>
+					<li>
+						<p>
+							ありえないことが起きたとき、プログラムは既に想定外の不整合状態に突入しており、以降の一切の実行は信頼できない。
+							これは復帰できることを期待すべきでないバグであり、プログラムをさっさと異常終了すべきである。
+						</p>
+						<p>
+							これは「プログラムのバグが原因」ということでもある。
+							認めたくないかもしれないが、「起きうることを想定できていない」という時点で仕様レベルのバグがあるか、思った通りにプログラム状態を更新できないという実装バグのどちらかである。
+						</p>
+					</li>
+				</ul>
+			</li>
+		</ul>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+
+	<ul>
+		<li>
+			<phrase>
+				不整合について
+			</phrase>
+			<ul>
+				<li>
+					<p>
+						不整合から復帰しようとするべきでない
+					</p>
+					<ul>
+						<li>
+							<p>
+								不整合が、発見した瞬間の発見した場所のみに留まっていると思わないこと。
+								プログラム全体が既に汚染されていると思うこと。
+							</p>
+							<p>
+								<strong>不整合の発見は手遅れのサイン</strong>。
+							</p>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<p>
+						それはバグです
+					</p>
+					<ul>
+						<li>
+							<p>
+								不整合状態は実行時エラーではなく仕様バグか実装バグである。
+							</p>
+							<p>
+								バグをエラーとして通知してユーザに処理させようとしてはいけない。
+								ユーザはバグを仕様とは見做していない。
+							</p>
+						</li>
+					</ul>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>
+				panic について
+			</phrase>
+			<ul>
+				<li>
+					<p>
+						不整合状態を発見したら panic せよ
+					</p>
+					<ul>
+						<li>
+							<p>
+								不整合の発見は手遅れのサイン。
+							</p>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<p>
+						panic を使うべき場面で <code>Err</code> を返すべからず
+					</p>
+					<ul>
+						<li>
+							<p>
+								不整合状態をユーザに無視させてはいけないし、復帰を試みるべきでない。
+							</p>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<p>
+						assert を特定の意味で使うべし
+					</p>
+					<ul>
+						<li>
+							<p>
+								不整合状態になっていない<strong>はずであることを表明</strong>するのに使うこと。
+							</p>
+							<p>
+								assert を省略可能にする (省略が仕様を変えないようにする) のが良い。
+							</p>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<p>
+						<strong>panic を躊躇うべからず</strong>
+					</p>
+				</li>
+			</ul>
+		</li>
+	</ul>
+</section>
+
+<section xml:id="references">
+	<title>参考文献</title>
+	<ul>
+		<li>
+			<phrase>
+				Rust 公式ドキュメント
+			</phrase>
+			<ul>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/1.39.0/std/macro.panic.html">std::panic - Rust</link> (1.39.0)
+				</li>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-00-error-handling.html">Error Handling - The Rust Programming Language</link> (1.39.0)
+				</li>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-01-unrecoverable-errors-with-panic.html">Unrecoverable Errors with panic! - The Rust Programming Language</link> (1.39.0)
+				</li>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html">To panic! or Not To panic! - The Rust Programming Language</link> (1.39.0)
+				</li>
+			</ul>
+		</li>
+	</ul>
+</section>
+
+</article>
