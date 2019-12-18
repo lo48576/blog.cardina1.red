@@ -14,6 +14,7 @@ RELATIVIZE_PATH_XHTML_OPTS = {
 COLORIZE_SYNTAX_XHTML_OPTS = {
   default_colorizer: :pygmentsrb,
   syntax: :xml,
+  outside_pre: true,
   pygmentsrb: {
     options: {
       classprefix: 'tok-',
