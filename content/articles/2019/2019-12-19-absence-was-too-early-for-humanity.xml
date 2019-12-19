@@ -1,0 +1,429 @@
+---
+created_at: 2019-12-19T13:38:35+09:00
+published_at: 2019-12-19T23:41:31+09:00
+format: article2019
+title: "非存在は人類には早すぎた"
+tags:
+  - advent-calendar
+  - programming
+kind: article
+
+excerpt: "今回ご紹介するいい話はこちら、2005年産のインターネットネイティブな非存在です。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2019-12-19-absence-was-too-early-for-humanity"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>非存在は人類には早すぎた</title>
+
+<p>
+	どうもこんにちは。
+	皆さん、存在してますか？
+</p>
+<p>
+	一般に人間は非存在が苦手です。
+	null, empty, absent などなど、非存在が人類には早すぎた例は枚挙に暇がございません。
+	その中から今回紹介するのはこちら、 <link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986 Uniform Resource Identifier (URI): Generic Syntax</link> (2005年産) です。
+	インターネットネイティブな非存在のテイストをお楽しみください。
+</p>
+
+<p>
+	この記事は <link xl:href="https://adventar.org/calendars/4115">IQ1 Advent Calendar 2019</link> の19日目の記事です。
+</p>
+
+<section xml:id="tl-dr-quiz">
+	<title>TL;DR クイズ</title>
+
+	<p>
+		問題です。
+		解くのに必要な IQ は 1 です。
+	</p>
+	<p>
+		<link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> では URI 文字列の文法などが既定されていますが、その中で「authority (ホスト名など) がないとき、パスが <code>//</code> から始まってはいけない」という制約が提示されています。
+		では、 <code>file:////etc/passwd</code> という文字列は、 <link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> で既定された URI の文法に適合しているでしょうか。
+			それとも、適合していないでしょうか。
+	</p>
+	<ul>
+		<li>
+			<phrase>
+				<link xl:href="https://xkcd.com/yes/">適合していると思った人用リンク</link>
+			</phrase>
+		</li>
+		<li>
+			<phrase>
+				<link xl:href="https://xkcd.com/no/">適合していないと思った人用リンク</link>
+			</phrase>
+		</li>
+	</ul>
+
+	<p>
+		追加のクイズ: 以下の文字列が、妥当な URI か不正な URI か判別してください。
+	</p>
+	<ul>
+		<li>
+			<phrase><code>foo:</code></phrase>
+		</li>
+		<li>
+			<phrase><code>foo:/</code></phrase>
+		</li>
+		<li>
+			<phrase><code>foo://</code></phrase>
+		</li>
+		<li>
+			<phrase><code>foo:///</code></phrase>
+		</li>
+		<li>
+			<phrase><code>foo:////</code></phrase>
+		</li>
+		<li>
+			<phrase><code>foo://///</code></phrase>
+		</li>
+	</ul>
+
+	<p>
+		答えは <link linkend="conclusion">結論</link> セクションをご覧ください。
+	</p>
+</section>
+
+<section xml:id="what-is-uri">
+	<title>URI とは何ぞや</title>
+
+	<p>
+		URI (Uniform Resource Identifier) とは、 web でお馴染みの URL をちょっと拡張した感じの概念です。
+		URL (Uniform Resource Locator) は名前の通り「場所」を指すために使われるものでした。
+		これを単に場所として使うだけでなく、 web 上のあらゆるリソースを一意な名前で指すための識別子として使えると、データの共有や連携が捗るよねという寸法です。
+		たとえば RFC 3986 では以下のような例が挙げられています。
+	</p>
+	<ul>
+		<li>
+			<uri>ftp://ftp.is.co.za/rfc/rfc1808.txt</uri>
+		</li>
+		<li>
+			<uri>http://www.ietf.org/rfc/rfc2396.txt</uri>
+		</li>
+		<li>
+			<uri>ldap://[2001:db8::7]/c=GB?objectClass?one</uri>
+		</li>
+		<li>
+			<uri>mailto:John.Doe@example.com</uri>
+		</li>
+		<li>
+			<uri>news:comp.infosystems.www.servers.unix</uri>
+		</li>
+		<li>
+			<uri>tel:+1-816-555-1212</uri>
+		</li>
+		<li>
+			<uri>telnet://192.0.2.16:80/</uri>
+		</li>
+		<li>
+			<uri>urn:oasis:names:specification:docbook:dtd:xml:4.1.2</uri>
+		</li>
+	</ul>
+	<p>
+		こういった (そしてこれらに限らない) さまざまなリソースを共通の統一的な文法で指すことができるようになるのが URI という概念の偉大さです。
+	</p>
+</section>
+
+<section xml:id="uri-syntax">
+	<title>URI の文法</title>
+
+	<p>
+		URI の文法は、主に <link xl:href="https://tools.ietf.org/html/rfc3986#section-3">RFC 3986 の §3 (Syntax Components)</link> で、 ABNF を用いて定義されています。
+	</p>
+	<figure>
+		<programlisting><![CDATA[URI         = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+
+hier-part   = "//" authority path-abempty
+            / path-absolute
+            / path-rootless
+            / path-empty
+
+scheme      = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+
+authority   = [ userinfo "@" ] host [ ":" port ]
+
+path          = path-abempty    ; begins with "/" or is empty
+              / path-absolute   ; begins with "/" but not "//"
+              / path-noscheme   ; begins with a non-colon segment
+              / path-rootless   ; begins with a segment
+              / path-empty      ; zero characters
+
+path-abempty  = *( "/" segment )
+path-absolute = "/" [ segment-nz *( "/" segment ) ]
+path-noscheme = segment-nz-nc *( "/" segment )
+path-rootless = segment-nz *( "/" segment )
+path-empty    = 0<pchar>]]></programlisting>
+		<caption>
+			URI の文法定義の一部抜粋
+		</caption>
+	</figure>
+	<p>
+		こんな感じです。
+		読めますね。
+	</p>
+
+	<section xml:id="uri-syntax--restriction">
+		<title>制限</title>
+
+		<p>
+			しかし残念ながら話はこれで終わりません。
+			§3 では、以下のような但し書きが存在します。
+		</p>
+		<blockquote xml:lang="en" cite="https://tools.ietf.org/html/rfc3986#section-3">
+			<p>
+				The scheme and path components are required, though the path may be empty (no characters).
+				<strong>
+					When authority is present, the path must either be empty or begin with a slash ("/") character.
+					When authority is not present, the path cannot begin with two slash characters ("//").
+				</strong>
+				These restrictions result in five different ABNF rules for a path (Section 3.3), only one of which will match any given URI reference.
+			</p>
+			<footer>
+				<link xl:href="https://tools.ietf.org/html/rfc3986#section-3"><citetitle>RFC 3986, §3 (Syntax Components)</citetitle></link>,
+				<pubdate><time datetime="2005-01">2005-01</time></pubdate>,
+				<comment>強調は引用者による</comment>
+			</footer>
+		</blockquote>
+		<p>
+			ややこしくなってきました。
+			一応日本語にしておくと、「authority がある (present) なら、 path は空であるか "/" で始まる。 authority がない (not present) なら、 path は "//" で始まってはいけない」と書いてあります。
+		</p>
+		<p>
+			ところで、 authority の定義を見てみると、 authority は空になることができます。
+		</p>
+		<figure>
+			<programlisting><![CDATA[URI         = scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+
+hier-part   = "//" authority path-abempty
+            / path-absolute
+            / path-rootless
+            / path-empty
+
+scheme      = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+
+authority   = [ userinfo "@" ] host [ ":" port ]
+host        = IP-literal / IPv4address / reg-name
+reg-name    = *( unreserved / pct-encoded / sub-delims )]]></programlisting>
+			<caption>
+				関連部分再掲
+			</caption>
+		</figure>
+		<p>
+			たとえば <code>file:////etc/passwd</code> という文字列を考えてみると、 <code>file</code> が scheme なのは良いとして、 <code>////etc/passwd</code> は一体なんなのでしょうか。
+			<code><![CDATA[<scheme="file">://<authority=""><path="//etc/passwd">]]></code> のようにパースされるべきでしょうか？
+			それとも <code><![CDATA[<scheme="file">:<path="////etc/passwd">]]></code> のようにパースされるべきでしょうか？
+			いずれにせよ、「authority がないなら path は <code>//</code> で始まってはいけない」に違犯している気がします。
+			でも、本当に？
+			空の authority は absent だと見做すべきなのでしょうか？
+			もしそうでないなら前者は valid ということになります。
+		</p>
+		<p>
+			<code>file:////etc/passwd</code> が URI として invalid なのかそうでないのか。
+			この記事では、その謎に迫ります。
+		</p>
+	</section>
+</section>
+
+<section xml:id="hints">
+	<title>手掛かり</title>
+
+	<section xml:id="hints--alternative-representation">
+		<title>もうひとつの表現</title>
+
+		<p>
+			実は「"//" で始めては駄目」を別の場所で別の表現を使って書いている部分があり、読解のための手掛かりになります。
+		</p>
+		<blockquote xml:lang="en" cite="https://tools.ietf.org/html/rfc3986#section-3.3">
+			<p>
+				If a URI <strong>contains an authority component</strong>, then the path component must either be empty or begin with a slash ("/") character.
+				If a URI <strong>does not contain an authority component</strong>, then the path cannot begin with two slash characters ("//").
+			</p>
+			<footer>
+				<link xl:href="https://tools.ietf.org/html/rfc3986#section-3.3"><citetitle>RFC 3986, §3.3 (Path)</citetitle></link>,
+				<pubdate><time datetime="2005-01">2005-01</time></pubdate>,
+				<comment>強調は引用者による</comment>
+			</footer>
+		</blockquote>
+		<p>
+			今回は <quote xml:lang="en"><qp>“</qp>When authority is present<qp>”</qp></quote> よりも表現が多少明確になっています。
+			authority が present か absent かではなく、 <strong>authority component を持っているか持っていないか</strong>で条件を指定していますね。
+			ここでは「空文字列は present なのか absent なのか」ではなく「component を持つかどうか」を考えれば良さそうなので、空文字列へのマッチも component の存在と見做せる気がしてきます。
+			つまり <code><![CDATA[<scheme="file">://<authority=""><path="//etc/passwd">]]></code> は「authority component を持っている」といえそうです。
+		</p>
+	</section>
+
+	<section xml:id="hints--restriction-and-match-ambiguity">
+		<title>制限とマッチの曖昧性</title>
+
+		<p>
+			もうひとつ気になるのが、 present なら〜 の文の直後に書かれたこの文です。
+		</p>
+		<blockquote cite="https://tools.ietf.org/html/rfc3986#section-3">
+			<p>
+				These restrictions result in five different ABNF rules for a path (Section 3.3),
+				only one of which will match any given URI reference.
+			</p>
+			<footer>
+				<link xl:href="https://tools.ietf.org/html/rfc3986#section-3">RFC 3986, §3 (Syntax Components)</link>,
+				<pubdate><time datetime="2005-01">2005-01</time></pubdate>
+			</footer>
+		</blockquote>
+		<p>
+			この記述を踏まえると、もしかしてこの制約は ABNF の文法に対して追加の制約を課すものではなく、文法のパースの曖昧性をなくすための制約である可能性が読み取れます。
+			もしそうなら、 <code><![CDATA[<scheme="file">://<authority=""><path="//etc/passwd">]]></code> の形でパース可能な <code>file:////etc/passwd</code> は妥当な URI ということになるでしょう。
+		</p>
+	</section>
+
+	<section xml:id="hints--abnf-comment">
+		<title>ABNF のコメント</title>
+
+		<p>
+			Errata にも、若干気になる記述があります。
+		</p>
+		<figure>
+			<blockquote xml:lang="en" cite="https://www.rfc-editor.org/errata/eid4393">
+				<p>
+					In fact, the ABNF here is more specific than it often is.
+					In other RFCs it will say things like<br />
+					<code>xyz = 0 / %x31-39 *2DIGIT ; valid values are 0-255</code><br />
+					...and just let the comment restrict the maximum value.
+				</p>
+				<footer>
+					<link xl:href="https://www.rfc-editor.org/errata/eid4393">Verifier notes for Errata ID 4393</link>,
+					<pubdate><time datetime="2015-06-15">2015-06-15</time></pubdate>,
+					<comment>フォント変更は引用者による</comment>
+				</footer>
+			</blockquote>
+			<caption>
+				RFC 3986 で利用されている ABNF (<link xl:href="https://tools.ietf.org/html/rfc2234">RFC 2234</link>)
+				<footnote xml:id="footnote-abnf-rfc-update" refmark-id="footnote-ref-abnf-rfc-update">
+					現在では <link xl:href="https://tools.ietf.org/html/rfc5234">RFC 5234</link> で置き換えられており、更には <link xl:href="https://tools.ietf.org/html/rfc7405">RFC 7405</link> が提案されている
+				</footnote>についての言及
+			</caption>
+		</figure>
+		<p>
+			この verifier note によれば、 RFC で利用される ABNF は構文解析アルゴリズムを直接に提示するものではなく、必要とあらばコメントを与えることで formal な文法として読み取れる以上の制約を与えるといった行為が行われるようです<footnote xml:id="footnote-abnf-comment" refmark-id="footnote-ref-abnf-comment">
+				そんなのアリかよとは思う
+			</footnote>。
+				となると、文法定義中に直接記述されていない <code>//</code> に関する記述は、文法をより強く制限するものではなく曖昧さをなくすだけのもので、文法が受理する文字列の集合自体に影響を与えないと考える方が自然のように思われます。
+		</p>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>結論</title>
+
+	<p>
+		ここまでで挙げた手掛かりから、 <strong><code>//</code> に関する制約は ABNF が受理する文字列を少なくしない</strong>と考えるのが自然であるといえます。
+	</p>
+	<p>
+		たとえば <code>foo://</code> が ABNF だけを見ると <code><![CDATA[<scheme="foo">://<authority=""><path="">]]></code> と <code><![CDATA[<scheme="foo">:<path="//">]]></code> のどちらとしても解釈できるわけです。
+		ここで「authority がないなら path は <code>//</code> で始まってはいけない」のルールが曖昧性排除のためのルールだと考えると、後者の解釈が排除され、前者の解釈のみが可能になります。
+		これにより一意な構文解析が可能になりました。
+	</p>
+
+	<section xml:id="conclusion--quiz-answers">
+		<title>クイズの答え</title>
+
+		<p>
+			さて、この理解を前提に RFC 3986 を読むと、記事冒頭で出したクイズの答えは「<strong>全部妥当な URI として解釈できる</strong>」です。
+		</p>
+		<ul>
+			<li>
+				<phrase>
+					<code>file:////etc/passwd</code>
+					→
+					<code><![CDATA[<scheme="file">://<path="//etc/passwd">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo:</code>
+					→
+					<code><![CDATA[<scheme="foo">:<path="">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo:/</code>
+					→
+					<code><![CDATA[<scheme="foo">:<path="/">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo://</code>
+					→
+					<code><![CDATA[<scheme="foo">://<authority=""><path="">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo:///</code>
+					→
+					<code><![CDATA[<scheme="foo">://<authority=""><path="/">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo:////</code>
+					→
+					<code><![CDATA[<scheme="foo">://<authority=""><path="//">]]></code>
+				</phrase>
+			</li>
+			<li>
+				<phrase>
+					<code>foo://///</code>
+					→
+					<code><![CDATA[<scheme="foo">://<authority=""><path="///">]]></code>
+				</phrase>
+			</li>
+		</ul>
+	</section>
+
+	<section xml:id="conclusion--what-was-confusing">
+		<title>結局何が厄介だったのか</title>
+
+		<p>
+			結局のところ何が規格読解を困難にしていたかというと、 <quote xml:lang="en"><qp>“</qp>When authority is not present<qp>”</qp></quote> や <quote xml:lang="en"><qp>“</qp>If a URI does not contain an authority component<qp>”</qp></quote> という文面が、空文字列を "not present" や "does not contain" と見做す文章なのかが曖昧だったというところにあります。
+			まるで RDB の<strong>空文字列と NULL を同一視するかどうか問題</strong>みたいですね。
+		</p>
+		<p>
+			IQ1 には、空文字列と存在しない文字列を区別するのはあまりに大変でした。
+			皆さんが規格を書くようなことがあれば、<strong>空のものと非存在を明確に区別できるよう表現を工夫したり付記を残す</strong>ことをおすすめいたします。
+		</p>
+	</section>
+</section>
+
+<section xml:id="bonus">
+	<title>おまけ</title>
+
+	<section xml:id="bonus--why">
+		<title>何でこんなこと考えたの</title>
+
+		<p>
+			妥当な URI (RFC 3986) / IRI (RFC 3987) の文字列のみを持てるような型を実装したかったからです。
+			成果は <link xl:href="https://crates.io/crates/iri-string">iri-string</link> crate として公開しています。
+			<link xl:href="https://docs.rs/iri-string/0.2.3/iri_string/index.html#foo-foo-foo-foo-foo--are-valid-iris">ドキュメントにも同様の説明を追加</link> しました。
+			もし URI / IRI を用いる Rust プログラムを書く機会があればどうぞ。
+		</p>
+	</section>
+</section>
+
+<section xml:id="references">
+	<title>参考文献</title>
+	<ul>
+		<li>
+			<phrase>
+				<link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986 - Uniform Resource Identifier (URI): Generic Syntax</link>
+			</phrase>
+		</li>
+	</ul>
+</section>
+
+</article>
