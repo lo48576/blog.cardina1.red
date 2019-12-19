@@ -202,7 +202,7 @@ excerpt: "Rust では様々な方法で panic することができるが、何�
 		</li>
 	</ul>
 	<p>
-		すなわち Rust のエラー処理は、 C のような戻り値による成功・失敗の返却と多言語における例外機構のような仕組みの、どちらとしても機能するようにできている<footnote xml:id="footnote-panic-can-be-implemented-by-exception">
+		すなわち Rust のエラー処理は、 C のような戻り値による成功・失敗の返却と他言語における例外機構のような仕組みの、どちらとしても機能するようにできている<footnote xml:id="footnote-panic-can-be-implemented-by-exception">
 			内部的には panic は C++ などにおける例外機構と同様の仕組みで実装することが可能だが、内部実装はさておき、その意味するところは全く違う
 		</footnote>。
 	</p>
@@ -632,7 +632,7 @@ impl<T: Clone> SafeLinkedList<T> {
 		</p>
 		<blockquote cite="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html">
 			<p>
-				The <code>panic!</code> macro signals that <strong>your program is in a state it can’t handle</strong> and lets you tell the process to stop <strong>instead of trying to proceed with invalid or incorrect values</strong>.
+				The <code>panic!</code> macro signals that <strong>your program is in a state it can’t handle</strong> and lets you tell the process to <strong>stop instead of trying to proceed with invalid or incorrect values</strong>.
 			</p>
 			<footer>
 				<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html"><citetitle>To panic! or Not To panic! - The Rust Programming Language</citetitle> (Rust 1.39.0 TRPL)</link>,
@@ -802,7 +802,7 @@ impl Id {
     ///
     /// Panics if the given value is larger than or equal to `std::u32::MAX`.
     pub fn from_index(index: usize) -> Self {
-        assert!(index < std::u32::MAX); // <- This assert should never be removed!
+        assert!(index < std::u32::MAX as usize); // <- This assert should never be removed!
         Self(unsafe {
             NonZeroU32::new_unchecked(index + 1)
         })
@@ -933,7 +933,7 @@ impl Id {
 		</p>
 		<programlisting language="rust"><![CDATA[    // last child への参照を返す
     // self.last_child は `None` にされていない確信がある
-    match self.last_child {
+    match &self.last_child {
         Some(v) => v,
         None => panic!("Should never fail: previously set to `Some`"),
     }]]></programlisting>
