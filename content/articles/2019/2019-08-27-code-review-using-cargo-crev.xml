@@ -492,7 +492,7 @@ excerpt: "コードレビューは楽しい。"
 				</phrase>
 				<ul>
 					<li>
-						<link xl:href="https://doc.rust-lang.org/stable/std/iter/trait.FromIterator.html"><code>FromIterator</code></link> が実装されいてるのだから、 <link xl:href="https://doc.rust-lang.org/stable/std/iter/trait.Extend.html"><code>std::iter::Extend</code></link> も実装されているのが自然だよね、というだけの話。
+						<link xl:href="https://doc.rust-lang.org/stable/std/iter/trait.FromIterator.html"><code>FromIterator</code></link> が実装されているのだから、 <link xl:href="https://doc.rust-lang.org/stable/std/iter/trait.Extend.html"><code>std::iter::Extend</code></link> も実装されているのが自然だよね、というだけの話。
 					</li>
 				</ul>
 			</li>
