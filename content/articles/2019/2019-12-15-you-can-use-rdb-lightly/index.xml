@@ -38,6 +38,14 @@ excerpt: "表計算ソフトが嫌になったら関係データベースがお�
 		前日の記事は『<link xl:href="https://blog.rogiken.org/blog/2019/12/14/first_electronic_work/">初めて電子工作した話</link>』でした。
 </p>
 
+<note>
+	<title>「関係」</title>
+	<p>
+		<link xl:href="https://ja.wikipedia.org/wiki/%E9%96%A2%E4%BF%82%E3%83%A2%E3%83%87%E3%83%AB">関係モデル</link>の文脈においては<link xl:href="https://ja.wikipedia.org/wiki/%E9%96%A2%E4%BF%82_(%E3%83%87%E3%83%BC%E3%82%BF%E3%83%99%E3%83%BC%E3%82%B9)">「関係」は用語として特殊な意味を持っている</link>が、本記事では関係モデルや RDB の背景にある理論について踏み込んだ話はしない。
+		以下、本記事で使う「関係」という言葉は専門用語ではなく、一般的な意味での「関係」である。
+	</p>
+</note>
+
 <section xml:id="i-am-working-on-thesis" role="notoc">
 	<title>本題の前に</title>
 
