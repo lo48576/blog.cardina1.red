@@ -5,7 +5,7 @@ cd "$(dirname "$(readlink -f "$0")")/.."
 
 ################
 
-RACK_LIVERELOAD_PATH="$(realpath --relative-to=. "$(bundle show rack-livereload)")"
+RACK_LIVERELOAD_PATH="$(realpath --relative-to=. "$(bundle info --path rack-livereload)")"
 echo "rack-livereload: ${RACK_LIVERELOAD_PATH}"
 
 patch -p0 <<__EOF__
@@ -25,7 +25,7 @@ __EOF__
 
 ################
 
-NANOC_PATH="$(realpath --relative-to=. "$(bundle show nanoc)")"
+NANOC_PATH="$(realpath --relative-to=. "$(bundle info --path nanoc)")"
 echo "nanoc-path: ${NANOC_PATH}"
 
 patch -p0 <<__EOF__
