@@ -2,6 +2,10 @@
 
 $header-font-size: 2.2rem, 1.8rem, 1.5rem, 1.3rem, 1.2rem, 1.1rem;
 
+a.#{$permalink-class}:hover {
+	text-decoration: none;
+}
+
 @for $i from 1 to 7 {
 	%section-h#{$i} {
 		font-size: nth($header-font-size, $i);
