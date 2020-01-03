@@ -43,8 +43,8 @@ excerpt: "今回ご紹介するいい話はこちら、2005年産のインター
 		解くのに必要な IQ は 1 です。
 	</p>
 	<p>
-		<link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> では URI 文字列の文法などが既定されていますが、その中で「authority (ホスト名など) がないとき、パスが <code>//</code> から始まってはいけない」という制約が提示されています。
-		では、 <code>file:////etc/passwd</code> という文字列は、 <link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> で既定された URI の文法に適合しているでしょうか。
+		<link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> では URI 文字列の文法などが規定されていますが、その中で「authority (ホスト名など) がないとき、パスが <code>//</code> から始まってはいけない」という制約が提示されています。
+		では、 <code>file:////etc/passwd</code> という文字列は、 <link xl:href="https://tools.ietf.org/html/rfc3986">RFC 3986</link> で規定された URI の文法に適合しているでしょうか。
 			それとも、適合していないでしょうか。
 	</p>
 	<ul>
