@@ -12,14 +12,16 @@
 <xsl:template match="d:article" mode="ds:toc">
 	<xsl:param name="max-depth" select="3" />
 
-	<details class="toc" open="open">
-		<summary>
-			<xsl:text>目次</xsl:text>
-		</summary>
-		<xsl:apply-templates select="." mode="ds:toc-group">
-			<xsl:with-param name="max-depth" select="$max-depth" />
-		</xsl:apply-templates>
-	</details>
+	<aside class="toc">
+		<details class="toc" open="open">
+			<summary>
+				<xsl:text>目次</xsl:text>
+			</summary>
+			<xsl:apply-templates select="." mode="ds:toc-group">
+				<xsl:with-param name="max-depth" select="$max-depth" />
+			</xsl:apply-templates>
+		</details>
+	</aside>
 </xsl:template>
 
 <xsl:template match="d:*" mode="ds:toc-group">
