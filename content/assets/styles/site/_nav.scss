@@ -1,12 +1,30 @@
 @import '../vars';
 
-aside.article-info {
-	font-size: 0.7rem;
+dl.article-info {
+	line-height: 1.5em;
 
-	.article-dates p {
-		line-height: $vertical-unit;
+	dd, dt {
+		border-left: initial;
+		padding-left: initial;
 		margin: initial;
 	}
+	>div {
+		$header-name-width: 9em;
+
+		display: flex;
+		flex-wrap: wrap;
+
+		>dt {
+			width: $header-name-width;
+		}
+		>dd {
+			width: calc(100% - $header-name-width);
+		}
+	}
+}
+
+aside.article-info {
+	font-size: 0.8rem;
 }
 
 ul.blog-tags {
@@ -18,6 +36,8 @@ ul.blog-tags {
 
 		display: inline-block;
 		margin: 0;
+		line-height: inherit;
+
 		&::before {
 			margin-left: 0.25em;
 			content: " / " $tag-prefix;
@@ -25,14 +45,6 @@ ul.blog-tags {
 		&:first-child::before {
 			content: $tag-prefix;
 		}
-	}
-}
-
-ul.blog-tag-classes {
-	margin: 0;
-
-	ul.blog-tags {
-		display: inline-block;
 	}
 }
 

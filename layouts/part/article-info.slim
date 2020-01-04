@@ -1,0 +1,5 @@
+- target = @target || @item
+aside.article-info
+  dl.article-info
+    == render '/part/article-dates.*', target: target
+    == render '/part/tags.*', target: target

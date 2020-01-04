@@ -1,12 +1,10 @@
 - header_level = @header_level || 2
-- @target_items.each do |item|
-  section
+- @target_items.each_with_index do |item, idx|
+  section[style=(idx != 0 ? "margin-top: 3rem" : nil)]
     *{tag: "h#{header_level}"}
       == link_to h(item[:title]), item
-    aside.article-info
-      / Article metadata
-      == render '/part/article-dates.*', target: item
-      == render '/part/tags.*', target: item
+    / Article metadata
+    == render '/part/article-info.*', target: item
     div
       / Excerpt
       - if excerpt = item[:excerpt]

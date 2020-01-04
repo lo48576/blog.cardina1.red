@@ -1,19 +1,25 @@
 - target = @target || @item
-div.article-dates
-  /!
-  - if published_at = target[:published_at] || target[:created_at]
-    p
-      - year4 = published_at.strftime('%Y')
-      - month2 = published_at.strftime('%m')
-      ' published:
+- if published_at = target[:published_at] || target[:created_at]
+  div.article-published-at
+    - year4 = published_at.strftime('%Y')
+    - month2 = published_at.strftime('%m')
+    dt Published at
+    dd
       time[datetime=published_at.strftime('%FT%T%:z')]
         == link_to_unless_current "#{year4}", @items[source_path_for_archive(year4)]
         |/
         == link_to_unless_current "#{month2}", @items[source_path_for_archive(year4, month2)]
         |/
         == published_at.strftime('%d (%a) %H:%M %Z')
-  - if updated_at = target[:updated_at]
-    p
-      ' updated:
+- if updated_at = target[:updated_at]
+  div.article-updated-at
+    dt Updated at
+    dd
       time[datetime=updated_at.strftime('%FT%T%:z')]
         == updated_at.strftime('%Y/%m/%d (%a) %H:%M %Z')
+- if deprecated_since = target[:deprecated_since]
+  div.article-updated-at
+    dt Updated at
+    dd
+      time[datetime=deprecated_since.strftime('%FT%T%:z')]
+        == deprecated_since.strftime('%Y/%m/%d (%a) %H:%M %Z')

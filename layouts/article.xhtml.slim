@@ -3,9 +3,7 @@
 - render '/page-base.*', prev_uri: prev_path, next_uri: next_path
   - prev_next = render '/part/prev-next-page.*', prev_link: newer_article, next_link: older_article
   == prev_next
-  aside.article-info
-    == render '/part/article-dates.*'
-    == render '/part/tags.*'
+  == render '/part/article-info.*'
   hr
   == yield
   == prev_next
