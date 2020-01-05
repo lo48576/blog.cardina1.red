@@ -251,7 +251,7 @@ c464f345818ad873cc5934fbcc9e47e47ac89f72ec7c4b17574097ab31c1153b1e8586cb346be053
 								</mediaobject>
 								<caption>権限変更前の「セキュリティ」タブの様子</caption>
 							</figure>
-							<figure xml:id="fig-permission-change-dialog" class="col-xs-12 col-sm-6">
+							<figure xml:id="fig-permission-change-dialog">
 								<mediaobject>
 									<img src="permission-change-dialog.png" alt="「編集」ボタンを押して出るダイアログの図" />
 								</mediaobject>
@@ -278,13 +278,13 @@ c464f345818ad873cc5934fbcc9e47e47ac89f72ec7c4b17574097ab31c1153b1e8586cb346be053
 							<p>
 								「選択するオブジェクト名を入力してください」のテキストボックスに <userinput>NT SERVICE\TrustedInstaller</userinput> と入力し、「名前の確認」ボタンを押す
 							</p>
-							<figure xml:id="fig-user-select-1" class="col-xs-12 col-sm-6">
+							<figure xml:id="fig-user-select-1">
 								<mediaobject>
 									<img src="user-select-1.png" alt="所有者の「変更」ボタンを押して出るダイアログの図" />
 								</mediaobject>
 								<caption>所有者の「変更」ボタンを押して出るダイアログに名前を入力したところ</caption>
 							</figure>
-							<figure xml:id="fig-user-select-2" class="col-xs-12 col-sm-6">
+							<figure xml:id="fig-user-select-2">
 								<mediaobject>
 									<img src="user-select-2.png" alt="「名前の確認」ボタンを押した後の図" />
 								</mediaobject>
@@ -296,13 +296,13 @@ c464f345818ad873cc5934fbcc9e47e47ac89f72ec7c4b17574097ab31c1153b1e8586cb346be053
 								「OK」ボタンでダイアログを閉じ、「セキュリティの詳細設定」のウィンドウの「適用」ボタンを押す。
 								途中でダイアログが出るかもしれないが、「OK」を押しておけばおｋ。
 							</p>
-							<figure xml:id="fig-owner-change-notice" class="col-xs-12 col-sm-6">
+							<figure xml:id="fig-owner-change-notice">
 								<mediaobject>
 									<img src="owner-change-notice.png" alt="所有者の変更後に出るダイアログの図" />
 								</mediaobject>
 								<caption>所有者の変更後に出るダイアログ</caption>
 							</figure>
-							<figure xml:id="fig-advanced-config-after" class="col-xs-12 col-sm-6">
+							<figure xml:id="fig-advanced-config-after">
 								<mediaobject>
 									<img src="advanced-config-after.png" alt="作業完了後の「セキュリティの詳細設定」の状態の図" />
 								</mediaobject>

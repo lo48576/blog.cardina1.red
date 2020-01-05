@@ -104,7 +104,7 @@ excerpt: "2017年 第27週 まとめ"
 ]]></programlisting>
 					<caption>firefox の場合 (<link xl:href="screenshot-2017-07-05-202457%2B0900.png">キャプチャ画像</link>)</caption>
 				</figure>
-				<figure class="col-xs-12 col-lg-6">
+				<figure>
 					<programlisting language="html" data-lang="html"><![CDATA[
 改行1<br>改行2<br><br>改行3<br><br>改行4<br>
 ]]></programlisting>

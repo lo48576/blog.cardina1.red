@@ -269,14 +269,14 @@ lrwxrwxrwx 1 larry larry    6 2015-11-18 13:24 mlterm-256color -> mlterm
 	<p>
 		残念ながらこの状態だと、<code>tmux</code>が256色出してくれない。
 	</p>
-	<figure xml:id="figure-tmux-working-captures" role="independent-block grid-row">
-		<figure xml:id="figure-tmux-expected-colors" role="col-xs-12 col-sm-6">
+	<figure xml:id="figure-tmux-working-captures" role="independent-block">
+		<figure xml:id="figure-tmux-expected-colors">
 			<mediaobject>
 				<img src="mlterm-tmux-ok.png" alt="256色が正しく表示されることが期待されていた。" />
 			</mediaobject>
 			<caption>期待していた結果</caption>
 		</figure>
-		<figure xml:id="figure-tmux-actual-colors-by-official-terminfo" role="col-xs-12 col-sm-6">
+		<figure xml:id="figure-tmux-actual-colors-by-official-terminfo">
 			<mediaobject>
 				<img src="mlterm-tmux-bad.png" alt="実際には、256色どころか16色さえ正しく表示されていない。" />
 			</mediaobject>
