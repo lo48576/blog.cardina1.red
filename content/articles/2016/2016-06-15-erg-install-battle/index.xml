@@ -300,7 +300,7 @@ autorun.exe は動作を停止しました
 			<title>DVDをddrescueでサルベージ(してみたらそもそも破損してなかった)</title>
 
 			<p>
-				DVDやHDDのデータが破損していた場合、<link xlink:href="https://www.gnu.org/software/ddrescue/"><code>ddrescue</code></link>コマンドを使うのが常識である。
+				DVDやHDDのデータが破損していた場合、<link xl:href="https://www.gnu.org/software/ddrescue/"><code>ddrescue</code></link>コマンドを使うのが常識である。
 				というわけで、ホストのgentoo linuxで<code>ddrescue</code>してみたところ、<strong>そもそもエラーが発生しなかった</strong>。
 				ということはDVDとDVDドライブには問題がなく、Windows 10かVirtualBox側の問題だったということなのだろう。
 			</p>
@@ -352,7 +352,7 @@ autorun.exe は動作を停止しました
 		</li>
 	</ul>
 	<p>
-		twitter上での実況は<link xlink:href="http://togetter.com/li/987957">エロゲインストールバトル - Togetterまとめ</link>にまとめてある。
+		twitter上での実況は<link xl:href="http://togetter.com/li/987957">エロゲインストールバトル - Togetterまとめ</link>にまとめてある。
 	</p>
 </section>
 
@@ -378,7 +378,7 @@ autorun.exe は動作を停止しました
 		</blockquote>
 		<blockquote cite="https://twitter.com/i/web/status/728969641331023872">
 			<p>
-				致したいね <link xlink:href="https://t.co/If7XDNVDfR">pic.twitter.com/If7XDNVDfR</link>
+				致したいね <link xl:href="https://t.co/If7XDNVDfR">pic.twitter.com/If7XDNVDfR</link>
 			</p>
 			<mediaobject>
 				<img src="tweet-728969641331023872.jpg" alt="" role="blur tiny" xl:href="https://twitter.com/i/web/status/728969641331023872" />
@@ -414,7 +414,7 @@ autorun.exe は動作を停止しました
 		<title>追記2(<time datetime="2016-06-21T23:15:14+0900">2016-06-21</time>): 解決</title>
 		<p>
 			問題は解決された。
-			<link xlink:href="/2016/06/20/erg-install-battle-victory">エロゲインストールバトルに勝利</link>を参照。
+			<link xl:href="/2016/06/20/erg-install-battle-victory">エロゲインストールバトルに勝利</link>を参照。
 		</p>
 	</section>
 </section>
