@@ -82,7 +82,7 @@ excerpt: "コンパイルの必要なソースコードを(インタプリタ言
 		<figure xml:id="code-examples-c">
 			<figure>
 				<programlisting language="c"><![CDATA[#if 0
-gcc --std=c11 "$0" -o c-po &&; ./c-po
+gcc --std=c11 "$0" -o c-po && ./c-po
 exit
 #endif
 
@@ -272,7 +272,7 @@ OUT_PNG="${OUT_STEM}.png"
 if type dot >/dev/null ; then
     if dot -Tpng "$0" -o "${OUT_PNG}" ; then
         echo 'successfully built.'
-        type optipng >/dev/null &amp;&amp; optipng "${OUT_PNG}"
+        type optipng >/dev/null && optipng "${OUT_PNG}"
     else
         echo 'compile failed.' >&2
     fi
