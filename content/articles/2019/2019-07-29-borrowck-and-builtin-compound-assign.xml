@@ -517,6 +517,16 @@ fn main() {
 				</li>
 			</ul>
 		</li>
+		<li>
+			<phrase>
+				release note
+			</phrase>
+			<ul>
+				<li>
+					<link xl:href="https://github.com/rust-lang/rust/blob/1.40.0/RELEASES.md#compatibility-notes">Release note (Rust 1.40.0)</link>
+				</li>
+			</ul>
+		</li>
 	</ul>
 </section>
 
