@@ -532,7 +532,7 @@ fn main() {
 	</note>
 
 	<p>
-		<quote>this represents potential undefined behavior in your code</quote> などと言われると、実際に UB を引き起こしてみたくなるのが人情というものである (?)。
+		<quote xml:lang="en"><qp>“</qp>this represents potential undefined behavior in your code<qp>”</qp></quote> などと言われると、実際に UB を引き起こしてみたくなるのが人情というものである (?)。
 		やってみた (<link xl:href="https://play.rust-lang.org/?version=stable&amp;mode=debug&amp;edition=2018&amp;gist=00ff5b96b14643bdc917ee430dfc08dc">playground</link>)。
 	</p>
 
