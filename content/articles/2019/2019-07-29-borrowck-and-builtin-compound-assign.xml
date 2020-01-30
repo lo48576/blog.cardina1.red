@@ -28,6 +28,14 @@ excerpt: "Rust 1.36 では、組込の複合代入演算子では発生せずユ
 	正直なところ †完全に理解† するには遠く及ばない状況なので、もっと詳しく理解している人がいたら解説記事など書いてもらえると私が喜びます。
 </p>
 
+<note>
+	<title>Rust 1.39.0 で例外的な扱いは削除された</title>
+	<p>
+		<quote xml:lang="en"><qp>“</qp>this warning will become a hard error in the future<qp>”</qp></quote> と予告されていたように、 Rust 1.39.0 にて <link xl:href="https://github.com/rust-lang/rust/blob/1.40.0/RELEASES.md#compatibility-notes">一部ライフタイムエラーの例外的な扱いはなくなった</link>。
+		1.39.0 およびそれ以降の rustc では、この記事で警告とされているようなコードは素直にエラーとなる。
+	</p>
+</note>
+
 <section xml:id="question">
 	<title>問題</title>
 	<p>
@@ -514,6 +522,14 @@ fn main() {
 
 <section xml:id="appendix-unsoundness">
 	<title>おまけ: safe で unsound なコード</title>
+
+	<note>
+		<title>Rust 1.39.0 で例外的な扱いは削除された</title>
+		<p>
+			以下のコードは本記事公開時点のコンパイラ (Rust 1.36.0) に合わせて書かれたものである。
+			記事冒頭で述べたように、 Rust 1.39.0 およびそれ以降では未定義動作ではなくコンパイルエラーとなる。
+		</p>
+	</note>
 
 	<p>
 		<quote>this represents potential undefined behavior in your code</quote> などと言われると、実際に UB を引き起こしてみたくなるのが人情というものである (?)。
