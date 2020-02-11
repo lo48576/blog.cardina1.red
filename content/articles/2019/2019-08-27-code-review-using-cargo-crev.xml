@@ -1,7 +1,7 @@
 ---
 created_at: 2019-08-26T19:49:30+09:00
 published_at: 2019-08-27T05:02:01+09:00
-updated_at: 2019-08-30T17:10:29+09:00
+updated_at: 2020-02-11T17:05:14+09:00
 format: article2019
 title: "cargo crev でコードレビューをしてみたらバグを見付けた話など"
 tags:
@@ -806,6 +806,9 @@ excerpt: "コードレビューは楽しい。"
 		</li>
 		<li>
 			<link xl:href="http://lucumr.pocoo.org/2019/7/29/dependency-scaling/">Updated Thoughts on Trust Scaling | Armin Ronacher's Thoughts and Writings</link>
+		</li>
+		<li>
+			<link xl:href="https://dpc.pw/cargo-crev-and-rust-2019-fearless-code-reuse">cargo-crev and Rust 2019 fearless code reuse — Dawid Ciężarkiewicz aka `dpc`</link>
 		</li>
 	</ul>
 </section>
