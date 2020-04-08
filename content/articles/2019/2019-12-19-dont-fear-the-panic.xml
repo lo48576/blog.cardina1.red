@@ -72,7 +72,7 @@ excerpt: "Rust では様々な方法で panic することができるが、何�
 		</dt>
 		<dd>
 			<p>
-				<code>self</code> が <code>Option::Some(_)></code> や <code>Result::Ok(_)</code> であればその中身の値を返し、そうでなければ<code>&amp;str</code> のメッセージを表示して <strong>panic する</strong>。
+				<code>self</code> が <code>Option::Some(_)</code> や <code>Result::Ok(_)</code> であればその中身の値を返し、そうでなければ<code>&amp;str</code> のメッセージを表示して <strong>panic する</strong>。
 				<code>Result</code> の場合は、エラー値のデバッグ表示も行われる。
 			</p>
 			<p>
