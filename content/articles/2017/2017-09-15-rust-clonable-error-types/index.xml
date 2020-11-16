@@ -213,7 +213,7 @@ excerpt: "Rust でエラー型に Clone trait が実装されていてほしい�
 		<section xml:id="error-type-for-warnings--fsck-xv6">
 			<title>具体例: fsck-xv6 (自作)</title>
 			<p>
-				いつぞやの OS の授業の課題で <link xl:href="https://github.com/mit-pdos/xv6-public">xv6</link> のファイルシステムの validator (<link xl:href="https://gitlab.cardina1.red/lo48576/titech-1610-os/tree/homework/4/fsck-xv6">fsck-xv6</link>) を実装したことがあり、このときもファイルシステムエラーを表現するための型に <code>Error</code> trait を実装した。
+				いつぞやの OS の授業の課題で <link xl:href="https://github.com/mit-pdos/xv6-public">xv6</link> のファイルシステムの validator (<link xl:href="https://gitlab.com/lo48576/titech-1610-os/tree/homework/4/fsck-xv6">fsck-xv6</link>) を実装したことがあり、このときもファイルシステムエラーを表現するための型に <code>Error</code> trait を実装した。
 			</p>
 			<p>
 				こちらは一般的な意味での「エラー」ではあるが、ファイルシステムの妥当性検証という性質上、ファイルシステムのエラーがそのままプログラムの継続不可能を意味するわけではない。
@@ -233,7 +233,7 @@ excerpt: "Rust でエラー型に Clone trait が実装されていてほしい�
         }
     }
 ]]></programlisting>
-					<caption><link xl:href="https://gitlab.cardina1.red/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/main.rs#L24-33"><filename>src/main.rs</filename>, <code>main</code> 関数内</link>より抜粋</caption>
+					<caption><link xl:href="https://gitlab.com/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/main.rs#L24-33"><filename>src/main.rs</filename>, <code>main</code> 関数内</link>より抜粋</caption>
 				</figure>
 				<figure>
 					<programlisting language="rust"><![CDATA[
@@ -243,7 +243,7 @@ pub fn validate<P: AsRef<Path>>(path: P) -> io::Result<Vec<Error>> {
 
     let mut errors = vec![];
 ]]></programlisting>
-					<caption><link xl:href="https://gitlab.cardina1.red/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/fs/mod.rs#L39-43"><filename>src/fs/mod.rs</filename>, トップレベル</link>より抜粋</caption>
+					<caption><link xl:href="https://gitlab.com/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/fs/mod.rs#L39-43"><filename>src/fs/mod.rs</filename>, トップレベル</link>より抜粋</caption>
 				</figure>
 				<figure>
 					<programlisting language="rust"><![CDATA[
@@ -255,7 +255,7 @@ pub enum Error {
     DirectoryWithoutDot { inode: Inode },
     DirectoryWithoutDotdot { inode: Inode },
 ]]></programlisting>
-					<caption><link xl:href="https://gitlab.cardina1.red/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/fs/error.rs#L9-15"><filename>src/fs/error.rs</filename>, トップレベル</link>より抜粋</caption>
+					<caption><link xl:href="https://gitlab.com/lo48576/titech-1610-os/blob/homework/4/fsck-xv6/src/fs/error.rs#L9-15"><filename>src/fs/error.rs</filename>, トップレベル</link>より抜粋</caption>
 				</figure>
 				<caption>エラー型の実装</caption>
 			</figure>
