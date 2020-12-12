@@ -1,0 +1,306 @@
+---
+created_at: 2020-12-12T21:59:28+09:00
+published_at: 2020-12-13T02:40:36+09:00
+format: article2019
+title: "Slack をクソの掃き溜めにするnの方法"
+tags:
+  - advent-calendar
+  - misc
+kind: article
+kind: article
+article_metadata:
+  image_url: "article-summary-iishakai-top.png"
+  image_base: "relpath"
+  image_alt: "Slack に作ると幸せになれるかもしれないチャンネルの情報"
+  image_large: true
+
+excerpt: "IQ1 のオタクどもが Slack で交流するために用意しておくと便利なチャンネルとその末路を紹介します。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2020-12-13-slack-good-stories"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Slack をクソの掃き溜めにするnの方法</title>
+
+<p>
+	IQ1 のオタクどもが Slack で交流するために用意しておくと便利なチャンネルとその末路を紹介します。
+</p>
+<p>
+		この記事は <link xl:href="https://adventar.org/calendars/5197">IQ1 Advent Calendar 2020</link> の13日目の記事です。
+</p>
+
+<section xml:id="slack">
+	<title>Slack を使うオタクたち</title>
+
+	<p>
+		オタクは Slack でコミュニティを作りがちなのですが [要出典]、その例に漏れず東工大のロ技研 (ロボット技術研究会) の14年入学メンバーの一部も Slack に集っています<footnote xml:id="footnote-tell-me-if-you-want-to-join">
+				なんとなく立ったワークスペースなのでメンバーの追加もガバガバです。
+				もしrogy14で参加したいのに追加されていない人がいたら、参加してそうなオタクにコンタクトを取ってください。
+			</footnote>。
+	</p>
+	<p>
+		さてこの Slack というサービス、お仕事や研究でどう使うといいという話はちょくちょく耳にするのですが、これといった目的もなくくだらない雑談ばかりしているオタクへのノウハウみたいなものをあまり目にしません。
+		せっかくなので、 IQ1 の親玉 (?) であるところのちゃっくも所属しているロ技研14の Slack における事例を紹介しようと思います。
+	</p>
+	<p>
+		参考にするか反面教師にするかは皆さん次第です。
+	</p>
+</section>
+
+<section xml:id="good-stories">
+	<title>いい話紹介</title>
+
+	言うまでもありませんが、ここでいういい話とは †いい話† です。
+	英語で言うなら 𝒈𝒐𝒐𝒅 𝒔𝒕𝒐𝒓𝒊𝒆𝒔™ みたいな？ (?)
+
+	<section xml:id="good-stories--workspace-icon">
+		<title>ワークスペースのアイコンが勝手にメンバーの顔にされていた</title>
+
+		<figure>
+			<mediaobject>
+				<img src="rogy14-workspace-icon.png" alt="ワークスペースのアイコンに14世代の元部長の顔が使われている。" />
+			</mediaobject>
+			<mediaobject>
+				<img src="rogy14-workspace-icon2.png" alt="誰が設定したのかわからない。" />
+			</mediaobject>
+			<caption>
+				14世代の元部長の顔が勝手に設定されていた。
+			</caption>
+		</figure>
+		<p>
+			最初期から治安が悪い。
+		</p>
+	</section>
+
+	<section xml:id="good-stories--sozai">
+		<title>素材チャンネル</title>
+
+		<p>
+			フリー素材を共有するためのチャンネルです。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="sozai-top.png" alt="sozai チャンネルの概要" />
+			</mediaobject>
+			<caption>チャンネルの概要</caption>
+		</figure>
+		<p>
+			このチャンネルは「フリー素材」という悪い文化に由来します。
+			この文脈でのフリー素材とは、「知り合いの顔を含む写真や動画等がインターネット上で公開状態になってしまい、無料で閲覧できるようになったもの」をいいます。
+			これは情報漏洩のようなものとは限らず、一般にはインタビュー記事などにより発生するものを指し、コラ画像やクソリプに使われることが多いです<footnote xml:id="free-sozai-example">
+				このようなフリー素材の例や用例としては、<link xl:href="https://www.google.com/search?q=%E8%A7%A3%E6%95%A3+%E7%B5%82%E4%BA%86+%E7%B5%82%E4%BA%86+%E7%B5%82%E4%BA%86&amp;tbm=isch">「解散 終了 終了 終了」などで検索する</link>とわかりやすいかもしれません。
+				<link xl:href="https://twitter.com/search?q=%22%E8%A7%A3%E6%95%A3%E7%B5%82%E4%BA%86%E7%B5%82%E4%BA%86%E7%B5%82%E4%BA%86%22&amp;src=typed_query&amp;f=image">Twitter での検索</link> などは特にわかりやすいです (ほんまか)。
+				他の例としては<link xl:href="https://www.google.co.jp/search?q=%E6%9D%B1%E5%B7%A5%E5%A4%A7%E3%81%AE%E5%BF%9C%E6%8F%B4%E5%B8%AD+%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF&amp;tbm=isch">「東工大の応援席 チェック」</link> などもあります。
+			</footnote>。
+			狭義にはこのように無料で入手できる (著作権で保護されていないとは言ってない) メディアを「フリー素材」と称しますが、転じて知り合いの顔を含む写真などそのもの、またクソリプに使える画像全般を「素材」と称することもあります。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="sozai-post01.png" alt="某氏が YouTube 動画に登場したときの投稿" />
+			</mediaobject>
+			<caption>某氏が YouTube 動画に登場したときの投稿</caption>
+		</figure>
+		<p>
+			悪名高き <code>#sozai</code> は、ロ技研全体用 Slack にもありました。
+			†伝統† ですね。
+		</p>
+		<p>
+			個人情報関連のものなので例を挙げるのが難しいのですが、とりあえず問題なさそうな例 (問題ないとは言ってない) としては、「カラオケの動画で部員(らりお)にそっくりな人物が出現するため『本日のらりお』などとして投稿する」というものがあります。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="rogy-sozai-post01.png" alt="本日のらりお その1"></img>
+			</mediaobject>
+			<mediaobject>
+				<img src="rogy-sozai-post02.png" alt="本日のらりお その2"></img>
+			</mediaobject>
+			<mediaobject>
+				<img src="rogy-sozai-post03.png" alt="本日のらりお その3"></img>
+			</mediaobject>
+			<mediaobject>
+				<img src="rogy-sozai-post04.png" alt="本日のらりお その4"></img>
+			</mediaobject>
+			<caption>「本日のらりお」</caption>
+		</figure>
+		<p>
+			皆さんも無料でアクセス可能な共通の知り合いの顔写真等を発見したら <code>#sozai</code> に投稿しましょう。
+		</p>
+	</section>
+
+	<section xml:id="good-stories--dlsite">
+		<title>#dlsite</title>
+
+		<p>
+			<code>#dlsite</code> というチャンネルがあります。
+			名前こそ DLsite ですが、 DLsite で手に入りそうなマテリアル全般についての話題なので Fanza (DMM) 等の話もできます。
+			政治的に正しい。 (?)
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="dlsite-top.png" alt="dlsite チャンネルの説明。" />
+			</mediaobject>
+			<caption><code>#dlsite</code> の説明。「どんどん活用していきましょう！」</caption>
+		</figure>
+		<p>
+			深く考えるまでもないクソチャンネルですが、思ったよりちゃんと (?) 動いていて謎です。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="dlsite-post01.png" alt="くだらない話をしている様子" />
+			</mediaobject>
+			<caption>トピックがトピックなので当然内容もくだらない</caption>
+		</figure>
+		<p>
+			ちなみに最初うっかり全員追加のチャンネルになってしまってアレでした。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="dlsite-mistake.png" alt="誤って全員参加の dlsite チャンネルを作ってしまい、すぐにアーカイブされた図" />
+			</mediaobject>
+			<caption>ﾊｲ</caption>
+		</figure>
+	</section>
+
+	<section xml:id="good-stories--movie">
+		<title>movie-comic-novel-dorama-anime-curry-ramen チャンネル</title>
+
+		<p>
+			任意のおすすめ情報 (NSFW なものを除く) が流れてくる場所です。
+			常識的！
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="movie-top.png" alt="movie-comic-novel-dorama-anime-curry-ramen チャンネルの概要" />
+			</mediaobject>
+			<caption>
+				<code>#movie-comic-novel-dorama-anime-curry-ramen</code> チャンネルの概要。
+					隠していても最初の発言者がわかる
+			</caption>
+		</figure>
+		<p>
+			最初はおすすめの映画用のチャンネルだったはずなのですが (名前も <code>#movie</code> だった)、のちに任意のおすすめ用に拡張されました。
+			「おすすめの映画(以外もｱﾘ)」の代表格として movie, comic, novel, drama, anime, curry, ramen が何故選ばれたのかは不透明です。
+			個人的には <code>#not-dlsite</code> とかにした方がシンプルでいいのではと思うのですが (は？？？)
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="movie-post01.png" alt="movie チャンネルが movie-comic-novel-dorama-anime-curry-ramen チャンネルになった。" />
+			</mediaobject>
+			<caption>
+				<code>#movie-comic-novel-dorama-anime-curry-ramen</code> チャンネルに進化した瞬間
+			</caption>
+		</figure>
+		<p>
+			あとドラマの綴りは本来 drama なんですが、 dorama になっているところに愛嬌を感じます (???)
+		</p>
+	</section>
+
+	<section xml:id="good-stories--good-society">
+		<title>#いい社会</title>
+
+		<p>
+			†いい社会† トークをするチャンネルです。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-top.png" alt="いい社会チャンネル" />
+			</mediaobject>
+			<caption>†いい社会† の †いい話† をする場所</caption>
+		</figure>
+		<p>
+			言うまでもありませんが †いい社会† は反語であり、思わずにっこりしてしまうような社会や人間のハートフル (hurtful) な話題を共有することを目的としています。
+		</p>
+		<p>
+			性質が性質だけに、当然くれぐれも言ってはいけないことを言わないよう気をつけねばなりません。
+			以下では、匿名であればなんとか公開しても問題が生じなさそうな例を紹介します。
+			(事務連絡: 問題があったらワイに連絡くれ)
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post01.png" alt="いい社会 01" />
+			</mediaobject>
+			<caption>本物のハッカー</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post02.png" alt="いい社会 02" />
+			</mediaobject>
+			<caption>監視社会</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post03.png" alt="いい社会 03" />
+			</mediaobject>
+			<caption>幼稚園児</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post04.png" alt="いい社会 04" />
+			</mediaobject>
+			<caption>C++ は †いい言語† なので、例外がなくても使われる</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post05.png" alt="いい社会 05" />
+			</mediaobject>
+			<caption>リモートワークのプロたち</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post06.png" alt="いい社会 06" />
+			</mediaobject>
+			<caption>†いい仕事†</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post07.png" alt="いい社会 07" />
+			</mediaobject>
+			<caption>†労働者の歓び†</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post08.png" alt="いい社会 08" />
+			</mediaobject>
+			<caption>† TIPS †</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post09.png" alt="いい社会 09" />
+			</mediaobject>
+			<caption>IQが1</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post10.png" alt="いい社会 10" />
+			</mediaobject>
+			<caption>ｼｬｶｲ</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post11.png" alt="いい社会 11" />
+			</mediaobject>
+			<caption>素材</caption>
+		</figure>
+		<figure>
+			<mediaobject>
+				<img src="iishakai-post12.png" alt="いい社会 12" />
+			</mediaobject>
+			<caption>politically incorrect</caption>
+		</figure>
+		<p>
+			なんだかクズが多めな印象がありますが、ちょっとここで公開できなそうな<footnote xml:id="footnote-very-good-story-no-disclosure">
+				べつにリーク情報があるとかではなく (遵法精神！！！)、この Slack ワークスペースは互いに所属や人間性をそれなりに知っているという前提で話をするので、前提を共有していない人に公開するとプライベートや所属がバレそうだったり誤解されそうな投稿は公開できません。
+			</footnote>†いい話† なども沢山あるので、べつにクズトークしかしてないというわけではないです。
+		</p>
+		<p>
+			<code>#いい社会</code> チャンネルは愚痴の捌け口にもなり、同時に第三者としては笑える話題の集積所にもなるので、見た目の治安に反して精神衛生の維持に貢献します。
+				もし気心の知れたメンバーで内輪 Slack ワークスペースを作ることになったら、ぜひ <code>#いい話</code> とか <code>#いい社会</code> チャンネルを作ることをおすすめします。
+		</p>
+	</section>
+</section>
+
+</article>
