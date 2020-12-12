@@ -38,6 +38,10 @@
 		},
 	}
 -%>
-<%= render '/part/article-metadata/twitter/summary.*', data: data -%>
+<% if article_meta&.dig(:image_large) -%>
+  <%= render '/part/article-metadata/twitter/summary-with-large-image.*', data: data -%>
+<%- else -%>
+  <%= render '/part/article-metadata/twitter/summary.*', data: data -%>
+<%- end -%>
 <%= render '/part/article-metadata/opengraph/article.*', data: data -%>
 <%-# vim: set ft=eruby : -%>
