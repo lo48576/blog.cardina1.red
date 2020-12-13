@@ -1,0 +1,559 @@
+---
+created_at: 2020-12-13T03:19:54+09:00
+published_at: 2020-12-14T00:07:13+09:00
+format: article2019
+title: "Cargo.toml を壊れたままにしない"
+tags:
+  - advent-calendar
+  - prog-rust
+kind: article
+article_metadata:
+  image_url: "article-summary-msrv-minimal-deps-ci-failure.png"
+  image_base: "relpath"
+  image_alt: "最小 Rust バージョンと最小依存バージョンでの CI が失敗してしまった様子"
+  image_large: true
+
+excerpt: "Rust で Cargo.toml により依存パッケージのバージョン指定をしますが、これが壊れている場合が見受けられます。気付いて直しましょう。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2019-12-19-dont-fear-the-panic"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Cargo.toml を壊れたままにしない</title>
+
+<p>
+	Rust で <filename>Cargo.toml</filename> により依存パッケージのバージョン指定をしますが、これが壊れている場合が見受けられます。
+	このような問題の解説や、気付いて直すための方法についての話です。
+</p>
+<p>
+	この記事は <link xl:href="https://qiita.com/advent-calendar/2020/rust">Rust Advent Calendar 2020</link> の14日目の記事です。
+	前日になっても枠が空いていたので、最近思うところを急遽突っ込むことにしました。
+	<br />
+	前日の記事は『<link xl:href="https://qiita.com/Pctg-x8/items/b96b9a45d082a5d42208">Dhallの型定義からRustの型を自動生成するマクロ</link>』でした。
+</p>
+
+<section xml:id="tl-dr">
+	<title>TL;DR</title>
+
+	もう少し詳しくは <xref linkend="conclusion" /> を参照のこと。
+
+	<ul>
+		<li>
+			依存バージョンを指定するときは、マイナーバージョンやパッチバージョンまで含めて最新のものを指定しましょう。
+		</li>
+		<li>
+			<strong><code>cargo +nightly update -Z minimal-versions</code></strong> で、制約を満たす最小バージョンへの依存を使った <filename>Cargo.lock</filename> を生成し、ビルドやテストを実行しましょう。
+		</li>
+		<li>
+			最小バージョンでのテストを CI で自動実行しましょう。
+		</li>
+		<li>
+			依存先に問題を見付けたら報告・修正しましょう。
+		</li>
+		<li>
+			<filename>README.md</filename> で <code>foo = "1"</code> などのような不正確な案内をするのをやめましょう。
+		</li>
+	</ul>
+</section>
+
+<section xml:id="dependency-versions-in-cargo-toml">
+	<title><filename>Cargo.toml</filename> に記載する依存バージョン</title>
+
+	<p>
+		まず <filename>Cargo.toml</filename> に記載するバージョン指定について説明します。
+		……といっても <link xl:href="https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html">The Cargo Book の該当ページ</link>に全て書いてあるのですが。
+	</p>
+	<p>
+		まず caret (<code>^</code>) による指定。
+		semantic versioning (semver) に基いて互換性のあるバージョンを許容する制約です。
+		<code>^</code> は省略可能なので、単にバージョン番号を書いた場合はこの解釈になります。
+	</p>
+	<blockquote>
+		<literallayout class="monospaced"><![CDATA[^1.2.3  :=  >=1.2.3, <2.0.0
+^1.2    :=  >=1.2.0, <2.0.0
+^1      :=  >=1.0.0, <2.0.0
+^0.2.3  :=  >=0.2.3, <0.3.0
+^0.2    :=  >=0.2.0, <0.3.0
+^0.0.3  :=  >=0.0.3, <0.0.4
+^0.0    :=  >=0.0.0, <0.1.0
+^0      :=  >=0.0.0, <1.0.0]]></literallayout>
+		<footer><link xl:href="https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html">The Cargo Book</link> より</footer>
+	</blockquote>
+	<p>
+		たとえば <code>libflate = "1"</code> あるいは <code>libflate = "^1"</code> (どちらも全く同じ意味です) と指定すると、「<code>libflate</code> crate の v1.0.0 あるいはその代わりに使えるバージョンを使う」という意味になります。
+		<time datetime="2020-12-13">現在 (2020-12-13)</time>であれば v1.0.3 ですが、将来的に v1.2.0 とか 1.9999.9999 が出た場合、それらのバージョンも選択肢に入ります。
+	</p>
+	<p>
+		他にも tilde (<code>~</code>) により指定する方法もあります。
+		これはパッチバージョンの上昇のみを認める制約で、雰囲気としては「指定された分の詳細度で」という感じです (ただし誤りの修正を意味するパッチバージョンを除く)。
+		たとえば semver では 1.2.3 のコードの代わりに 1.3.0 のコードを利用することが可能ですが、 <code>~1.2.3</code> はこれを受け入れません。
+		「1.2 と言ったら 1.2 にしてくれ、 1.3 は頼んでない」というわけです。
+	</p>
+	<p>
+		tilde requirements は、通常のユーザが利用する必要のないものです。
+		これは「ひとつのプロジェクトだが複数の crate に分けた」などの場合 (つまり別 crate の仕様についての完全な知識を用いており、知らない機能追加などがあっては困る場合など) に有用かもしれません<footnote xml:id="footnote-semver-and-new-feature" refmark-id="ref-footnote-semver-and-new-feature">
+			semantic versioning では、機能追加の場合 minor version (x.y.z の y の部分 (ただし x≠0)) を上げることになっています。
+			minor version の上昇を拒否するということは、すなわち「依存する crate に新規機能の追加があっては困る」という意思表明であり、これが意義を持つのは「依存する crate の挙動や出力を完全に、余すことなく理解している前提でコードを書いている」という場合です。
+			たとえば <code>#[non_exhaustive]</code> 指定された enum の全ての variant を知っているという想定でコードを書く場合などが考えられます。
+		</footnote>が、単なる crate のユーザとしてこの指定を利用するのは賢明ではありません。
+		よって本記事ではこれ以上の言及はしません。
+		caret, tilde 以外による指定についても同様に、本記事では言及しません。
+	</p>
+</section>
+
+<section xml:id="legacy-crates-and-broken-build">
+	<title>古い crate と壊れるビルド</title>
+
+	<p>
+		Rust では互換性を大事にしていますが、それでも互換性破壊が起きることはあります。
+		特に第三者が作った crate では、その semver 準拠 (つまり正しい互換性管理) は crate の開発者に一任されており、コンパイラや言語仕様の都合ばかりでなく、開発者が見落としや誤ったバージョン付けを行った場合でもユーザがその被害を被ることになります。
+	</p>
+
+	<section xml:id="legacy-crates-and-broken-build--example">
+		<title>具体例</title>
+
+		<p>
+			具体例を見てみましょう。
+		</p>
+		<figure>
+			<figure>
+				<programlisting language="toml"><![CDATA[[package]
+name = "test-dep"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+libflate = "1"]]></programlisting>
+				<caption>
+					<filename>Cargo.toml</filename>
+				</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo check
+    Updating crates.io index
+   Compiling crc32fast v1.2.1
+    Checking cfg-if v1.0.0
+    Checking rle-decode-fast v1.0.1
+    Checking libflate_lz77 v1.0.0
+    Checking adler32 v1.2.0
+    Checking libflate v1.0.3
+    Checking test-dep v0.0.0 (/run/user/1000/deptest/po)
+    Finished dev [unoptimized + debuginfo] target(s) in 3.21s
+$]]></programlisting>
+				<caption><code>cargo check</code> の実行結果</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo tree
+test-dep v0.0.0 (/run/user/1000/deptest/po)
+└── libflate v1.0.3
+    ├── adler32 v1.2.0
+    ├── crc32fast v1.2.1
+    │   └── cfg-if v1.0.0
+    ├── libflate_lz77 v1.0.0
+    └── rle-decode-fast v1.0.1
+$]]></programlisting>
+				<caption><code>cargo tree</code> の実行結果。 libflate v1.0.3 が使われているのがわかる。</caption>
+			</figure>
+			<caption>
+				<link xl:href="https://crates.io/crates/libflate">libflate</link> の <code>1</code> への依存を主張する crate のビルド結果
+			</caption>
+		</figure>
+		<p>
+			<code>libflate = "1"</code> と指定すると、先に解説したように 1.0.0 と互換な任意のバージョンを使えると cargo に伝えることになります。
+			cargo は最初のビルドや <code>cargo update</code> 等の機会に、利用可能な中で最新のバージョンを取得します。
+			<time datetime="2020-12-13T17:14:06+09:00">2020-12-13</time> 時点では v1.0.3 が最新で、これが利用されていることがメッセージからわかります。
+		</p>
+		<p>
+			さて、これでコンパイルが通ったからといって <code>cargo publish</code> してしまう人は多いのでしょうが、実はこの <filename>Cargo.toml</filename> は<strong>壊れている</strong>のです。
+			実際に確認してみましょう。
+		</p>
+		<figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo +nightly update -Z minimal-versions
+    Updating crates.io index
+    Updating adler32 v1.2.0 -> v1.0.0
+    Removing cfg-if v1.0.0
+    Updating crc32fast v1.2.1 -> v1.0.1
+    Updating libflate v1.0.3 -> v1.0.0
+    Updating rle-decode-fast v1.0.1 -> v1.0.0
+      Adding rustc_version v0.2.0
+      Adding semver v0.6.0
+      Adding semver-parser v0.7.0
+$]]></programlisting>
+				<caption>依存 crate について、互換性のある最新バージョンではなく、互換性のある最古バージョンを用いるようにする</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo tree
+test-dep v0.0.0 (/run/user/1000/deptest/po)
+└── libflate v1.0.0
+    ├── adler32 v1.0.0
+    ├── crc32fast v1.0.1
+    │   [build-dependencies]
+    │   └── rustc_version v0.2.0
+    │       └── semver v0.6.0
+    │           └── semver-parser v0.7.0
+    ├── libflate_lz77 v1.0.0
+    └── rle-decode-fast v1.0.0
+$]]></programlisting>
+				<caption><code>cargo tree</code> の実行結果。 libflate として最新の v1.0.3 でなく可能な最古の v1.0.0 が使われているのがわかる。</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo check
+   Compiling semver-parser v0.7.0
+    Checking rle-decode-fast v1.0.0
+    Checking adler32 v1.0.0
+   Compiling semver v0.6.0
+   Compiling rustc_version v0.2.0
+   Compiling crc32fast v1.0.1
+error[E0277]: the trait bound `Version: From<({integer}, {integer}, {integer})>` is not satisfied
+ --> /home/lo48576/.cargo/registry/src/github.com-1ecc6299db9ec823/crc32fast-1.0.1/build.rs:8:30
+  |
+8 |     if version >= (1, 27, 0).into() {
+  |                              ^^^^ the trait `From<({integer}, {integer}, {integer})>` is not implemented for `Version`
+  |
+  = help: the following implementations were found:
+            <Version as From<semver_parser::version::Version>>
+  = note: required because of the requirements on the impl of `Into<Version>` for `({integer}, {integer}, {integer})`
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `crc32fast`
+
+To learn more, run the command again with --verbose.
+$]]></programlisting>
+				<caption>ビルドが通らない</caption>
+			</figure>
+			<caption><filename>Cargo.toml</filename> の指定に従っているのにビルドが失敗する例</caption>
+		</figure>
+		<p>
+			何が起きているかというと、 Rust コンパイラである <code>rustc</code> の <code>--version</code> オプションの出力が rustc 1.29.0 から<link xl:href="https://github.com/rust-lang/rust/pull/52052">変化した</link>のですが、ビルド時依存である <code>rustc_verison</code> crate の v0.2.0 が<link xl:href="https://github.com/Kimundi/rustc-version-rs/issues/11">これに対応しておらず</link>、結果コンパイルエラーとなるのです。
+			この問題は crc32fast crate の v1.1.1 以降で<link xl:href="https://github.com/srijs/rust-crc32fast/commit/748869d592db7948a9b5c9b03eb784f18dfb2adb">対処されている</link>のですが、当然この問題が存在しなかった時代の人々が <filename>Cargo.toml</filename> で事前にこれに対処することはできません。
+			つまり後から壊れてしまったビルドは、<strong>後世の人々が気付いて修正するしかない</strong>のです。
+		</p>
+		<p>
+			この例の場合であれば libflate v1.0.1 で<link xl:href="https://github.com/sile/libflate/pull/51">対処済</link><footnote xml:id="footnote-libflate-minimal-dep-fix" refmark-id="ref-footnote-libflate-minimal-dep-fix">
+				何を隠そう、この修正パッチを投げたのは私です
+			</footnote>ですから、 <filename>Cargo.toml</filename> で <code>libflate = "1.0.1"</code> を指定してやれば問題なくコンパイルが通るであろうと予想できます。
+		</p>
+		<figure>
+			<figure>
+				<programlisting language="toml"><![CDATA[[package]
+name = "test-dep"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+libflate = "1.0.1"]]></programlisting>
+				<caption>ビルドが通る正しいバージョンを指定した <filename>Cargo.toml</filename></caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo +nightly update -Z minimal-versions
+    Updating crates.io index
+    Updating crc32fast v1.0.1 -> v1.1.1
+    Updating libflate v1.0.0 -> v1.0.1
+    Removing rustc_version v0.2.0
+    Removing semver v0.6.0
+    Removing semver-parser v0.7.0
+$]]></programlisting>
+				<caption>更新された <filename>Cargo.toml</filename> に従って、改めて最小バージョンを使うよう設定する</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo tree
+test-dep v0.0.0 (/run/user/1000/deptest/po)
+└── libflate v1.0.1
+    ├── adler32 v1.0.0
+    ├── crc32fast v1.1.1
+    ├── libflate_lz77 v1.0.0
+    └── rle-decode-fast v1.0.0]]></programlisting>
+				<caption><code>cargo tree</code> の実行結果。 crc32fast v1.1.1 が利用されており、 rustc_version crate への依存がなくなった</caption>
+			</figure>
+			<figure>
+				<programlisting><![CDATA[$ cargo check
+   Compiling crc32fast v1.1.1
+    Checking libflate v1.0.1
+    Checking test-dep v0.0.0 (/run/user/1000/deptest/po)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.82s]]></programlisting>
+				<caption>要求を満たす最小バージョンの crate でビルドしても、問題なくビルドできるようになった</caption>
+			</figure>
+			<caption>依存バージョン指定を「正しく」記載することで、ビルドが通るようになった</caption>
+		</figure>
+	</section>
+
+	<section xml:id="legacy-crates-and-broken-build--what-is-broken-cargo-toml">
+		<title><filename>Cargo.toml</filename>が壊れているということ</title>
+
+		<p>
+			先の具体例で見たように、文法的に正しく、普通に実行してもビルドが通るような <filename>Cargo.toml</filename> についても、<strong>サイレントに壊れている</strong>場合があります。
+				ここでいう壊れているとは、<strong><filename>Cargo.toml</filename> で指定された制約に従って依存 crate を準備したのにビルドが通らない</strong>ということです。
+			こういった壊れ方は <code>cargo update</code> 等により症状が隠れてしまう場合もあり、見逃されがちです。
+		</p>
+		<p>
+			このような壊れた <filename>Cargo.toml</filename> の発生要因としては、以下のようなものが考えられます。
+		</p>
+
+		<section xml:id="legacy-crates-and-broken-build--what-is-broken-cargo-toml--unnecessarily-loose-deps">
+			<title><filename>Cargo.toml</filename> で不必要に緩いバージョンを指定した</title>
+
+			<p>
+				一番ありそうな原因です。
+				たとえば今から libflate crate に依存するプロジェクトを書くとして、 <code>libflate = "1.0.3"</code> と指定すればいいところを、要らぬ気をきかせて <code>libflate = "1"</code> と指定してしまうと、一部の環境や特殊な条件下でのビルドで失敗するような壊れた <filename>Cargo.toml</filename> のできあがりです。
+			</p>
+		</section>
+		<section xml:id="legacy-crates-and-broken-build--what-is-broken-cargo-toml--unnecessarily-loose-deps">
+			<title>Rust や rustc のバージョンアップで依存している crate が壊れた</title>
+
+			<p>
+				次いでありそうな原因です。
+				この場合、問題に気付いてから依存バージョンを(問題修正済のものに)上げるなり、当該 crate への依存自体を回避するようコード書き換えるなりする必要があります。
+				ただ、これも後述の CI などで日常的に検査しておかないと、問題修正済の crate がリリースされた後で問題に気付くことは困難です。
+			</p>
+		</section>
+		<section xml:id="legacy-crates-and-broken-build--what-is-broken-cargo-toml--unnecessarily-loose-deps">
+			<title>依存している crate が semver に従わない非互換な更新をした</title>
+
+			<p>
+				あまり信じたくはない話ですが、まあ残念ながらなくもないです。
+				その原因は様々で、単に更新内容に見落としがあったとか、互換性破壊が発生することに気付かなかったとか、そもそも互換性破壊に相当するかコンセンサスが形成されていない<footnote xml:id="footnote-incompatibility-consensus-msrv" refmark-id="ref-footnote-incompatibility-consensus-msrv">
+					典型的には、 API に変化はないが MSRV (Minimum Supported Rust Version, サポートされている最小の Rust バージョン) が上がるような場合などを breaking change として扱うべきか否か、コンセンサスが固まっていないようです
+				</footnote>とか、いろいろ考えられます。
+				気付いたら泣きながら依存バージョンを上げましょう。
+			</p>
+			<p>
+				この壊れ方の場合は先に挙げた例とは逆に、 <code>cargo update</code> により問題が顕在化するようになります。
+				それゆえ問題に気付くチャンスも増えるでしょう。
+			</p>
+		</section>
+	</section>
+</section>
+
+<section xml:id="what-to-do-to-prevent-cargo-toml-breakage">
+	<title><filename>Cargo.toml</filename> を壊さないために、何をすべきか</title>
+
+	<p>
+		<filename>Cargo.toml</filename> を壊さない、壊れたことに気付くための方法はいくつかあります。
+	</p>
+
+	<section xml:id="what-to-do-to-prevent-cargo-toml-breakage--add-latest-versions">
+		<title>新しい依存を追加するときは、古いものではなく最新のバージョンを明示的に指定する</title>
+
+		<p>
+			依存 crate のバージョンは不必要に緩くすべきではありません。
+			現状で利用可能な、あるいは利用するつもりの API を持つバージョンのうちで、最新のものをパッチバージョンまで含めて (つまり <code>"x.y.z"</code> の形で) 指定しましょう。
+		</p>
+		<p>
+			たとえば libflate への依存を新たに追加したいのであれば、 <code>libflate = "1"</code> と書くのではなく <code>libflate = "1.0.3"</code> のように最新のものを指定すべきでしょう。
+			なぜならあなたはこれから libflate v1.0.0 を用いて実装するのではなく、 v1.0.3 で実装と動作確認を行うことになるからです。
+		</p>
+		<p>
+			あるいは serde を例に出してもいいかもしれません。
+			気をきかせたつもりで <code>serde = "1"</code> と書くのは簡単ですが、本当に serde v1.0.0 や serde_derive v1.0.0 でビルドできることを保証したいのですか？
+			serde v1.0.1 以降の追加・修正を必要としないコードを書いている確信があるのですか？
+			そのつもりがないなら、軽率に <code>serde = "1"</code> のような緩い制約を指定すべきではありません。
+		</p>
+	</section>
+
+	<section xml:id="what-to-do-to-prevent-cargo-toml-breakage--test-locally">
+		<title>ローカルで検査する</title>
+
+		<p>
+			要は制約が不必要に緩いのが問題なのであって、こういう場合手っ取り早くやるにはエッジケースでテストをするものと相場が決まっています [要出典]。
+			ここでいうエッジケースとは、すなわち最新のバージョンと最古のバージョンです<footnote xml:id="footnote-edge-case-versions" refmark-id="ref-footnote-edge-case-versions">
+				もちろんエッジケースのみの検査で完全ではないのは言うまでもなく、たとえば依存バージョンについて完全な検査をするなら、制約を満たすあらゆる依存バージョンの組み合わせでテストをする必要があります。
+				が、当然それは実用的でなく、また最初と最後が問題なければ中間のバージョンも問題ないことがそれなりに期待できることから、妥協して最古と最新のバージョンだけで検査しましょうということです。
+			</footnote>。
+		</p>
+		<p>
+			最新のバージョンを <code>cargo update</code> で利用できるのは言うまでもありませんが、最古のバージョンを利用させる <filename>Cargo.lock</filename> の生成には nightly ツールチェインが必要です。
+			これは <filename>Cargo.lock</filename> の生成だけに必要で、一度生成してしまえば他の部分で nightly を使う必要はありません。
+		</p>
+		<p>
+			<strong><code>cargo +nightly update -Z minimal-versions</code></strong> を実行して <filename>Cargo.lock</filename> を生成し、しかるのちに <code>cargo check</code> や <code>cargo test</code>などしましょう。
+			それだけです。
+		</p>
+		<p>
+			また、もし feature flag などによって追加の依存が発生することがあるなら、ビルド時に適宜 <code>--no-default-features</code> とか <code>--all-features</code> とかの有無のバリエーションも含めてテストするのが良いかと思います。
+			特定の feature を有効化したらビルドできなくなったとか悲しいので。
+		</p>
+	</section>
+
+	<section xml:id="what-to-do-to-prevent-cargo-toml-breakage--test-by-ci">
+		<title>CI で自動的に検査する</title>
+
+		<p>
+			GitHub や GitLab などメジャーな git リポジトリホスティングサービスは CI との連携機能を提供しており、 OSS については無料で利用可能な場合が多いです。
+			せっかくなので、単に最新の依存でビルドできるかだけではなく、制約を満たす最古のバージョンでビルドできるかも自動的に検査しましょう。
+		</p>
+		<p>
+			手順としては簡単で、ビルドやテストの前に rust の nightly ツールチェインをインストールし、 <code>cargo +nightly update -Z minimal-versions</code> を実行するだけです。
+			手動でやることとほとんど変わりません。
+			これにより所望の <filename>Cargo.lock</filename> が生成されるので、後の工程では nightly ツールチェインは不要です。
+			普通に stable なり beta なり MSRV なりで <code>cargo check</code> や <code>cargo test</code> を実行しましょう。
+		</p>
+		<figure>
+			<programlisting language="yaml"><![CDATA[
+# Template for test stage.
+.test_template: &test
+  stage: test
+  before_script:
+    # Use dependencies with minimal versions, if `USE_MINIMAL_VERSIONS` is nonzero.
+    - if [ "${USE_MINIMAL_VERSIONS:-0}" -ne 0 ] ; then
+        rustup install nightly &&
+        cargo +nightly update -Z minimal-versions ;
+      fi
+
+# (snip)...
+
+test:msrv:all-features-minimal-versions:
+  <<: *test_msrv
+  variables:
+    FEATURES: --all-features
+    USE_MINIMAL_VERSIONS: 1]]></programlisting>
+			<caption>
+				<link xl:href="https://gitlab.com/lo48576/datetime-string/-/blob/v0.2.1/.gitlab-ci.yml#L33-70">GitLab CI での設定例</link>
+			</caption>
+		</figure>
+		<figure>
+			<programlisting language="yaml"><![CDATA[before_install:
+  # (snip)...
+  - |
+    if [ "${TEST_MINIMAL_VERSIONS:-0}" -ne 0 ] ; then
+        rustup install nightly
+    fi
+before_script:
+  # Use dependencies with minimal versions.
+  - |
+    if [ "${TEST_MINIMAL_VERSIONS:-0}" -ne 0 ] ; then
+        cargo +nightly update -Z minimal-versions
+    fi]]></programlisting>
+			<caption>
+				<link xl:href="https://github.com/lo48576/fbxcel/blob/0361b33ef5d23f8133828e64b29443f03a0bc506/.travis.yml#L13-L29">Travis CI での設定例</link>
+			</caption>
+		</figure>
+	</section>
+
+	<section xml:id="what-to-do-to-prevent-cargo-toml-breakage--report-upstream">
+		<title>依存 crate に問題を発見したら報告する (可能ならパッチを投げる)</title>
+
+		<p>
+			残念ながら、自分の書いた <filename>Cargo.toml</filename> でなく依存 crate での指定に問題があった場合、自分のプロジェクトでの CI が失敗することがあります。
+			このような場合、問題を報告しましょう。
+			気付いたあなたが直すのです。
+		</p>
+		<p>
+			というか私も<link xl:href="https://github.com/sile/libflate/pull/51">何度か</link><link xl:href="https://github.com/rust-lang/git2-rs/pull/608">そういう</link><link xl:href="https://github.com/Gilnaa/globwalk/pull/30">パッチを</link><link xl:href="https://github.com/Keats/tera/pull/583">投げた</link>ことがあり、もしや <filename>Cargo.toml</filename> の破壊という概念に誰も気付いていないのでは？？？ と思ったのでこの記事を書いています。
+			各位たのむ〜。
+		</p>
+
+		<p>
+			とはいえ、依存 crate の問題とはいっても、依存の連鎖を深く辿らないと原因の crate が出てこなかったり、問題が起きなくなる最小のバージョンを二分探索や CHANGELOG 確認で探したり、複数 crate が同時に壊れていたりなど、解決に手間がかかるケースもあります。
+			べつに本質的な難しさがあるわけではないのですが単純に面倒だったりするので、無理に頑張って諦めたり放置するくらいならまずは issue だけでも報告してしまいましょう。
+		</p>
+	</section>
+
+	<section xml:id="what-to-do-to-prevent-cargo-toml-breakage--stop-providing-inaccurate-version-example">
+		<title><filename>README.md</filename> 等で不正確なバージョンでの案内をしない</title>
+
+		<p>
+			よく <filename>README.md</filename> で「<filename>Cargo.toml</filename> に <code>foo = "1.2"</code> と書くと、この crate が利用できるようになりますよ〜」みたいな案内がある crate をよく見掛けます。
+			ここで不正確なバージョン番号を提示してあると、何も考えずそれを使って将来的に壊れるなどというケースがありえるので、ちゃんと正確な (<code>"1.2.3"</code> のような) バージョンを記載しましょう。
+			リリース前のバージョン番号更新忘れにも注意です。
+		</p>
+		<p>
+			そもそもの話をしてしまうと、私はあの案内は普通に不要だと思うのです。
+			単にコマンドをインストールしたいユーザならともかく、 Rust で物を書こうという人はたぶん <link xl:href="https://doc.rust-lang.org/book/">TRPL</link> とかを読んでると思うんですよね。
+			リリース毎に更新すべき箇所を断片的に増やして案の定忘れたりするくらいなら、最初からこんな基礎的で誤りやすい案内はない方がマシだと思います。
+			README で案内せずとも <link xl:href="https://crates.io/crates/fbxcel">crates.io に <filename>Cargo.toml</filename> に追加すべき記述は掲載されている</link>わけですからね。
+		</p>
+		<p>
+			README で最新のバージョンを提示するだけなら <uri>https://img.shields.io/crates/v/{{crate_name}}.svg</uri> を使うことでバッヂ画像を取得できます。
+			たとえば serde なら <link xl:href="https://img.shields.io/crates/v/serde.svg"><uri>https://img.shields.io/crates/v/serde.svg</uri></link> といった具合です。
+			これを README の天辺に貼り付けて crates.io へのリンクにしておけば、バージョンの案内としては十分でしょう。
+		</p>
+		<figure>
+			<programlisting language="md"><![CDATA[[![Latest version](https://img.shields.io/crates/v/datetime-string.svg)](https://crates.io/crates/datetime-string)]]></programlisting>
+			<caption><link xl:href="https://gitlab.com/lo48576/datetime-string/-/blob/develop/README.md#L4">バッヂにより、 README で誤りの心配のないバージョン案内を出している例</link></caption>
+		</figure>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+
+	<ul>
+		<li>
+			<p>
+				<filename>Cargo.toml</filename> は壊れることがあります。
+				しかも <code>cargo update</code> で問題が隠れてしまう場合があります。
+			</p>
+		</li>
+		<li>
+			<p>
+				依存バージョンの指定を不必要に緩くすると、壊れた <filename>Cargo.toml</filename> になる場合があります。
+				これを回避するため、パッチバージョン (ピリオド区切りの3つめ、最後の数字) まで含めて、できるだけ新しいバージョンを明示的に指定しましょう。
+			</p>
+			<ul>
+				<li>
+					<p>
+						軽い気持ちで <code>foo = "1"</code> のような緩い指定をした結果壊れるようでは、ユーザが困ります。
+						<code>foo = "1.0.3"</code> のように、追加時点で使おうとしていたバージョンを明示しましょう。
+					</p>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<p>
+				nightly の rust をインストールし <strong><code>cargo +nightly update -Z minimal-versions</code></strong> を実行することで、制約を満たす最小バージョンへの依存を使った <filename>Cargo.lock</filename> を生成できます。
+				このコマンドの後で <code>cargo check</code> や <code>cargo test</code> を実行することで、 <code>Cargo.toml</code> の記述が壊れていないか検査できます。
+			</p>
+		</li>
+		<li>
+			<p>
+				<strong><code>cargo +nightly update -Z minimal-versions</code></strong> で生成した <filename>Cargo.lock</filename> による検査を自動的に行えるよう、 CI を設定しましょう。
+			</p>
+		</li>
+		<li>
+			<p>
+				最小依存バージョンでのビルドを試してみたら失敗することがあるかもしれません。
+				もし依存している crate が原因であれば、 issue で報告しましょう。
+			</p>
+			<ul>
+				<li>
+					<p>
+						<filename>Cargo.toml</filename> を適切に修正してパッチを提供できると尚良いのですが、手間がかかることもあります。
+						面倒になって放置するくらいなら最初から issue だけでも報告されていた方が助かるので、気力や余裕がなければ、まずは無理せず報告してみましょう。
+					</p>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<p>
+				README で <code>foo = "1"</code> などのような不正確な案内をするのをやめましょう。
+				基礎的すぎて誰に向けた案内なのか微妙なうえ、更新忘れなどのミスも発生しやすくなります。
+			</p>
+			<ul>
+				<li>
+					<p>
+						README で最新バージョンを提示したいのであれば、自動生成されるバッヂ画像と crates.io へのリンクで対応しましょう。
+					</p>
+				</li>
+				<li>
+					<p>
+						markdown なら <code>![Latest version](https://img.shields.io/crates/v/{{crate_name}}.svg)](https://crates.io/crates/{{crate_name}})</code> のようなものを追加しておくだけです。
+					</p>
+				</li>
+			</ul>
+		</li>
+	</ul>
+
+	<p>
+		あと本題ではありませんが微妙に関係するかもしれない話として、サポートする最小の Rust バージョン (MSRV, Minimum Supported Rust Version) も README とかで明示したうえで CI で検査してもらえると、パッチを投げる側としては大変助かります。
+		各位たのむ〜。
+	</p>
+</section>
+
+</article>
