@@ -26,7 +26,7 @@ excerpt: "Rust では様々な方法で panic することができるが、何�
 </p>
 
 <p>
-	この記事は <link xl:href="https://qiita.com/advent-calendar/2019/rust3">Rustその3 Advent Calendar 2019</link> の18日目の記事である<footnote xml:id="footnote-published-in-utc-timezone">
+	この記事は <link xl:href="https://qiita.com/advent-calendar/2019/rust3">Rustその3 Advent Calendar 2019</link> の18日目の記事である<footnote xml:id="footnote-published-in-utc-timezone" refmark-id="ref-footnote-published-in-utc-timezone">
 		UTC ではまだ 2019-12-18 です。許して。
 	</footnote>。
 </p>
@@ -202,7 +202,7 @@ excerpt: "Rust では様々な方法で panic することができるが、何�
 		</li>
 	</ul>
 	<p>
-		すなわち Rust のエラー処理は、 C のような戻り値による成功・失敗の返却と他言語における例外機構のような仕組みの、どちらとしても機能するようにできている<footnote xml:id="footnote-panic-can-be-implemented-by-exception">
+		すなわち Rust のエラー処理は、 C のような戻り値による成功・失敗の返却と他言語における例外機構のような仕組みの、どちらとしても機能するようにできている<footnote xml:id="footnote-panic-can-be-implemented-by-exception" refmark-id="ref-footnote-panic-can-be-implemented-by-exception">
 			内部的には panic は C++ などにおける例外機構と同様の仕組みで実装することが可能だが、内部実装はさておき、その意味するところは全く違う
 		</footnote>。
 	</p>
@@ -709,7 +709,7 @@ impl<T: Clone> SafeLinkedList<T> {
 			</dt>
 			<dd>
 				<p>
-					使ってはいけない<footnote xml:id="footnote-using-unwrap-in-tests">
+					使ってはいけない<footnote xml:id="footnote-using-unwrap-in-tests" refmark-id="ref-footnote-using-unwrap-in-tests">
 						テストであったり doctest (doc comment 中に書かれたテスト) 中で使う分には便利。
 						こういったテストは確信の表明というよりは「こうあるべきである」という仕様の表明なので、説明が既に近くに存在しているケースが多く、メッセージが冗長になりがち。
 					</footnote>。

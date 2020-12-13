@@ -37,7 +37,7 @@ excerpt: "IQ1 のオタクどもが Slack で交流するために用意して�
 	<title>Slack を使うオタクたち</title>
 
 	<p>
-		オタクは Slack でコミュニティを作りがちなのですが [要出典]、その例に漏れず東工大のロ技研 (ロボット技術研究会) の14年入学メンバーの一部も Slack に集っています<footnote xml:id="footnote-tell-me-if-you-want-to-join">
+		オタクは Slack でコミュニティを作りがちなのですが [要出典]、その例に漏れず東工大のロ技研 (ロボット技術研究会) の14年入学メンバーの一部も Slack に集っています<footnote xml:id="footnote-tell-me-if-you-want-to-join" refmark-id="ref-footnote-tell-me-if-you-want-to-join">
 				なんとなく立ったワークスペースなのでメンバーの追加もガバガバです。
 				もしrogy14で参加したいのに追加されていない人がいたら、参加してそうなオタクにコンタクトを取ってください。
 			</footnote>。
@@ -91,7 +91,7 @@ excerpt: "IQ1 のオタクどもが Slack で交流するために用意して�
 		<p>
 			このチャンネルは「フリー素材」という悪い文化に由来します。
 			この文脈でのフリー素材とは、「知り合いの顔を含む写真や動画等がインターネット上で公開状態になってしまい、無料で閲覧できるようになったもの」をいいます。
-			これは情報漏洩のようなものとは限らず、一般にはインタビュー記事などにより発生するものを指し、コラ画像やクソリプに使われることが多いです<footnote xml:id="free-sozai-example">
+			これは情報漏洩のようなものとは限らず、一般にはインタビュー記事などにより発生するものを指し、コラ画像やクソリプに使われることが多いです<footnote xml:id="footnote-free-sozai-example" refmark-id="ref-footnote-free-sozai-example">
 				このようなフリー素材の例や用例としては、<link xl:href="https://www.google.com/search?q=%E8%A7%A3%E6%95%A3+%E7%B5%82%E4%BA%86+%E7%B5%82%E4%BA%86+%E7%B5%82%E4%BA%86&amp;tbm=isch">「解散 終了 終了 終了」などで検索する</link>とわかりやすいかもしれません。
 				<link xl:href="https://twitter.com/search?q=%22%E8%A7%A3%E6%95%A3%E7%B5%82%E4%BA%86%E7%B5%82%E4%BA%86%E7%B5%82%E4%BA%86%22&amp;src=typed_query&amp;f=image">Twitter での検索</link> などは特にわかりやすいです (ほんまか)。
 				他の例としては<link xl:href="https://www.google.co.jp/search?q=%E6%9D%B1%E5%B7%A5%E5%A4%A7%E3%81%AE%E5%BF%9C%E6%8F%B4%E5%B8%AD+%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF&amp;tbm=isch">「東工大の応援席 チェック」</link> などもあります。
@@ -292,7 +292,7 @@ excerpt: "IQ1 のオタクどもが Slack で交流するために用意して�
 			<caption>politically incorrect</caption>
 		</figure>
 		<p>
-			なんだかクズが多めな印象がありますが、ちょっとここで公開できなそうな<footnote xml:id="footnote-very-good-story-no-disclosure">
+			なんだかクズが多めな印象がありますが、ちょっとここで公開できなそうな<footnote xml:id="footnote-very-good-story-no-disclosure" refmark-id="ref-footnote-very-good-story-no-disclosure">
 				べつにリーク情報があるとかではなく (遵法精神！！！)、この Slack ワークスペースは互いに所属や人間性をそれなりに知っているという前提で話をするので、前提を共有していない人に公開するとプライベートや所属がバレそうだったり誤解されそうな投稿は公開できません。
 			</footnote>†いい話† なども沢山あるので、べつにクズトークしかしてないというわけではないです。
 		</p>
