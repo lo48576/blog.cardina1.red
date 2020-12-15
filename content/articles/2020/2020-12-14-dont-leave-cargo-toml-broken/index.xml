@@ -133,7 +133,7 @@ libflate = "1"]]></programlisting>
 				</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo check
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo check</userinput><![CDATA[
     Updating crates.io index
    Compiling crc32fast v1.2.1
     Checking cfg-if v1.0.0
@@ -143,11 +143,11 @@ libflate = "1"]]></programlisting>
     Checking libflate v1.0.3
     Checking test-dep v0.0.0 (/run/user/1000/deptest/po)
     Finished dev [unoptimized + debuginfo] target(s) in 3.21s
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption><code>cargo check</code> の実行結果</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo tree
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo tree</userinput><![CDATA[
 test-dep v0.0.0 (/run/user/1000/deptest/po)
 └── libflate v1.0.3
     ├── adler32 v1.2.0
@@ -155,7 +155,7 @@ test-dep v0.0.0 (/run/user/1000/deptest/po)
     │   └── cfg-if v1.0.0
     ├── libflate_lz77 v1.0.0
     └── rle-decode-fast v1.0.1
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption><code>cargo tree</code> の実行結果。 libflate v1.0.3 が使われているのがわかる。</caption>
 			</figure>
 			<caption>
@@ -173,7 +173,7 @@ $]]></programlisting>
 		</p>
 		<figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo +nightly update -Z minimal-versions
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo +nightly update -Z minimal-versions</userinput><![CDATA[
     Updating crates.io index
     Updating adler32 v1.2.0 -> v1.0.0
     Removing cfg-if v1.0.0
@@ -183,11 +183,11 @@ $]]></programlisting>
       Adding rustc_version v0.2.0
       Adding semver v0.6.0
       Adding semver-parser v0.7.0
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption>依存 crate について、互換性のある最新バージョンではなく、互換性のある最古バージョンを用いるようにする</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo tree
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo tree</userinput><![CDATA[
 test-dep v0.0.0 (/run/user/1000/deptest/po)
 └── libflate v1.0.0
     ├── adler32 v1.0.0
@@ -198,11 +198,11 @@ test-dep v0.0.0 (/run/user/1000/deptest/po)
     │           └── semver-parser v0.7.0
     ├── libflate_lz77 v1.0.0
     └── rle-decode-fast v1.0.0
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption><code>cargo tree</code> の実行結果。 libflate として最新の v1.0.3 でなく可能な最古の v1.0.0 が使われているのがわかる。</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo check
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo check</userinput><![CDATA[
    Compiling semver-parser v0.7.0
     Checking rle-decode-fast v1.0.0
     Checking adler32 v1.0.0
@@ -225,7 +225,7 @@ For more information about this error, try `rustc --explain E0277`.
 error: could not compile `crc32fast`
 
 To learn more, run the command again with --verbose.
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption>ビルドが通らない</caption>
 			</figure>
 			<caption><filename>Cargo.toml</filename> の指定に従っているのにビルドが失敗する例</caption>
@@ -252,32 +252,34 @@ libflate = "1.0.1"]]></programlisting>
 				<caption>ビルドが通る正しいバージョンを指定した <filename>Cargo.toml</filename></caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo +nightly update -Z minimal-versions
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo +nightly update -Z minimal-versions</userinput><![CDATA[
     Updating crates.io index
     Updating crc32fast v1.0.1 -> v1.1.1
     Updating libflate v1.0.0 -> v1.0.1
     Removing rustc_version v0.2.0
     Removing semver v0.6.0
     Removing semver-parser v0.7.0
-$]]></programlisting>
+]]><prompt>$</prompt></screen>
 				<caption>更新された <filename>Cargo.toml</filename> に従って、改めて最小バージョンを使うよう設定する</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo tree
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo tree</userinput><![CDATA[
 test-dep v0.0.0 (/run/user/1000/deptest/po)
 └── libflate v1.0.1
     ├── adler32 v1.0.0
     ├── crc32fast v1.1.1
     ├── libflate_lz77 v1.0.0
-    └── rle-decode-fast v1.0.0]]></programlisting>
+    └── rle-decode-fast v1.0.0
+]]><prompt>$</prompt></screen>
 				<caption><code>cargo tree</code> の実行結果。 crc32fast v1.1.1 が利用されており、 rustc_version crate への依存がなくなった</caption>
 			</figure>
 			<figure>
-				<programlisting><![CDATA[$ cargo check
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo check</userinput><![CDATA[
    Compiling crc32fast v1.1.1
     Checking libflate v1.0.1
     Checking test-dep v0.0.0 (/run/user/1000/deptest/po)
-    Finished dev [unoptimized + debuginfo] target(s) in 0.82s]]></programlisting>
+    Finished dev [unoptimized + debuginfo] target(s) in 0.82s
+]]><prompt>$</prompt></screen>
 				<caption>要求を満たす最小バージョンの crate でビルドしても、問題なくビルドできるようになった</caption>
 			</figure>
 			<caption>依存バージョン指定を「正しく」記載することで、ビルドが通るようになった</caption>
