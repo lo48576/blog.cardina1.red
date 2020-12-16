@@ -1,7 +1,7 @@
 ---
 created_at: 2017-12-15T23:52:55+0900
 published_at: 2017-12-15T23:52:55+0900
-updated_at: 2018-01-01T00:44:03+09:00
+updated_at: 2020-12-17T03:09:02+09:00
 format: article2019
 title: "Mastodon が普及しつつあるけど、元 GNU Social 勢として思うこともありまして"
 tags:
@@ -177,6 +177,38 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 		というか、書いてる人をあまり見なかったので書いてみただけで、私の本題は<link linkend="think-of-non-mastodon-friends">次のセクション</link>以降なのでそっちを読んでほしいです。
 	</p>
 
+	<note xml:id="note-for-outdated-info-about-gnusocial">
+		<title>古くなった情報 (追記 <time datetime="2020-12-17">2020-12-17</time>)</title>
+		<p>
+			私がこの記事を書いたのは<time datetime="2017-12-07">2017年の12月</time>のことであるが、それからおよそ3年後の<time datetime="2020-12-17">2020年12月</time>現在、 GNU Social を巡る環境はだいぶ変化している。
+			記事本文は歴史を記す情報として訂正せずにおくが、代わりにここで現状についてある程度補足しておく。
+		</p>
+		<ul>
+			<li>
+				<p>
+					GNU Social の上流リポジトリが、 git.gnu.io から <link xl:href="https://notabug.org/diogo/gnu-social"><uri>https://notabug.org/diogo/gnu-social</uri></link> へ移行された。
+					また、公式 web サイトも <link xl:href="https://gnusocial.network/">gnusocial.network</link> になっている。
+				</p>
+			</li>
+			<li>
+				<p>
+					<time datetime="2020-12-17">2020年12月</time>現在、 GNU Social の開発はそこそこ活発である。
+					アクティブなコントリビュータも複数いるようなので、事実上のワンマン開発でもなくなっている。
+				</p>
+			</li>
+			<li>
+				<p>
+					<time datetime="2020-12-17">2020年12月</time>現在、 GNU Social は同梱のプラグインによって ActivityPub に対応している (はずである)。
+				</p>
+			</li>
+			<li>
+				<p>
+					GNU Social が PHP で動くことに変わりはないが、<time datetime="2020-12-17">2020年12月</time>現在の master ブランチ (安定版) は既に PHP 7 以上で動くようになっている。
+				</p>
+			</li>
+		</ul>
+	</note>
+
 	<table>
 		<caption>GNU Social と Mastodon の (プログラマ目線での) 比較</caption>
 		<thead>
@@ -255,6 +287,14 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 		<section xml:id="comparison--releases--gnusocial" role="notoc">
 			<title>GNU Social</title>
 
+			<note>
+				<title>潜在的に古い情報</title>
+				<p>
+					このセクションは古くなり現状に似わない情報を含むが、歴史の記述としてそのまま残してある。
+					変化した状況については <xref linkend="note-for-outdated-info-about-gnusocial" /> を参照。
+				</p>
+			</note>
+
 			<!-- FIXME -->
 			<blockquote cite="https://git.gnu.io/gnu/gnu-social/blob/50f9f23ff19a4f577c429d80411378d6a1747725/README.md#unstable-version">
 				<ul>
@@ -330,6 +370,14 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 	<section xml:id="comparison--number-of-active-comitters">
 		<title>アクティブなコミッタ数</title>
 
+		<note>
+			<title>潜在的に古い情報</title>
+			<p>
+				このセクションは古くなり現状に似わない情報を含むが、歴史の記述としてそのまま残してある。
+				変化した状況については <xref linkend="note-for-outdated-info-about-gnusocial" /> を参照。
+			</p>
+		</note>
+
 		<p>
 			GNU Social では、コミット権を持っているのは実質 @mmn 氏の一人だけしかいないように見え、 <link xl:href="https://git.gnu.io/gnu/gnu-social/commits/nightly">nightly のコミット一覧</link>を見ても @mmn 氏ばかりである。
 			(もちろん、 merge request は様々なユーザが出せる。)
@@ -346,6 +394,14 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 
 	<section xml:id="comparison--protocols">
 		<title>プロトコル</title>
+
+		<note>
+			<title>潜在的に古い情報</title>
+			<p>
+				このセクションは古くなり現状に似わない情報を含むが、歴史の記述としてそのまま残してある。
+				変化した状況については <xref linkend="note-for-outdated-info-about-gnusocial" /> を参照。
+			</p>
+		</note>
 
 		<p>
 			GNU Social は古くから OStatus へ対応しているが、 ActivityPub への対応の兆しはない<footnote xml:id="footnote-gnusocial-and-activitystreams" refmark-id="ref-footnote-gnusocial-and-activitystreams">
@@ -364,6 +420,14 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 
 		<section xml:id="comparison--language-and-runtime--gnusocial" role="notoc">
 			<title>GNU Social</title>
+
+			<note>
+				<title>潜在的に古い情報</title>
+				<p>
+					このセクションは古くなり現状に似わない情報を含むが、歴史の記述としてそのまま残してある。
+					変化した状況については <xref linkend="note-for-outdated-info-about-gnusocial" /> を参照。
+				</p>
+			</note>
 
 			<p>
 				このブログを燃やすつもりはないので本音を書くのは控えたいが、 GNU Social が PHP で開発されているのは流石に歴史を感じさせる。
