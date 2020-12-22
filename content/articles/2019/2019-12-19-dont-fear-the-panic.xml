@@ -870,7 +870,7 @@ impl Id {
 		<title>mutex で panic 由来の潜在的な不整合を扱う</title>
 
 		<p>
-			また、 thread と panic に関連した mutex の面白い機能として、 mutex を書き込み可能な状態で lock していたスレッドが panic したとき、 mutex は <link xl:href="https://doc.rust-lang.org/1.39.0/std/thread/index.html#the-threading-model">poisoned (汚染された) 状態</link>になる。
+			また、 thread と panic に関連した mutex の面白い機能として、 mutex を書き込み可能な状態で lock していたスレッドが panic したとき、 mutex は <link xl:href="https://doc.rust-lang.org/1.39.0/std/sync/struct.Mutex.html#poisoning">poisoned (汚染された) 状態</link>になる。
 			これは、壊れているかもしれないデータに、壊れているかもしれないと想定しているコードのみがアクセスできるようにする仕組みである。
 		</p>
 		<p>
