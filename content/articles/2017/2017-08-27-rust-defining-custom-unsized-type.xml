@@ -1,7 +1,7 @@
 ---
 created_at: 2017-08-27T21:32:53+0900
 published_at: 2017-08-27T21:32:53+0900
-updated_at: 2018-07-17T17:38:07+09:00
+updated_at: 2020-12-24T05:34:14+09:00
 format: article2019
 title: "Rust (1.19.0) でオレオレ unsized type を定義する"
 tags:
@@ -19,6 +19,49 @@ excerpt: "Rust-1.19.0 で str や std::path::Path のような型を定義する
 	version="0.1"
 >
 <title>Rust (1.19.0) でオレオレ unsized type を定義する</title>
+
+<important>
+	<title>[<time datetime="2020-12-24">2020-12-24</time>] 古く不完全な内容</title>
+
+	<p>
+		この記事の内容は古く不完全である。
+		一応調べ物の記録として残しておくが、内容の修正や更新には期待しないこと。
+	</p>
+	<p>
+		新しく <link xl:href="/2020/12/24/defining-custom-slice-types/">Rust (1.48.0) で独自のスライス型や文字列型を定義する</link> という記事を書いたので、原則としてそちらを参照すること。
+	</p>
+	<p>
+		この古い記事の問題は主に以下の点である。
+	</p>
+	<ul>
+		<li>
+			<phrase>
+				スライス型の定義で <strong><code>#[repr(transparent)]</code> と <code>#[repr(C)]</code> のいずれも使用していない</strong>
+			</phrase>
+			<ul>
+				<li>
+					そのようなコードは未定義動作を引き起こす。
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>記法が古い</phrase>
+			<ul>
+				<li>
+					edition 2018 の時代に <code>::std::borrow::Borrow</code> のような書き方はしない。
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>解説が最低限</phrase>
+			<ul>
+				<li>
+					実用的な型にするには多数のトレイト実装が必要だが、それらについて完全に説明を諦めている。
+				</li>
+			</ul>
+		</li>
+	</ul>
+</important>
 
 <p>
 	TL;DR: <xref linkend="conclusion" />
