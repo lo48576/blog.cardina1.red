@@ -38,7 +38,7 @@ diff -Naur ${NANOC_PATH}/lib/nanoc/filters/colorize_syntax.rb ${NANOC_PATH}/lib/
        doc = parse(content, parser, params.fetch(:is_fullpage, false))
 -      selector = params[:outside_pre] ? 'code' : 'pre > code'
 -      doc.css(selector).each do |element|
-+      selector = params[:outside_pre] ? './/*[local-name()="code"]' : './/*[local-name()="pre"]/*[local-name()="code"]'
++      selector = params[:outside_pre] ? './/*[local-name()="code"][@data-lang]' : './/*[local-name()="pre"]/*[local-name()="code"]'
 +      doc.xpath(selector).each do |element|
          # Get language
          extracted_language = extract_language(element)

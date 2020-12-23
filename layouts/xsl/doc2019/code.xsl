@@ -48,6 +48,7 @@
 		<xsl:apply-templates select="." mode="ds:attr-common">
 		</xsl:apply-templates>
 		<code>
+			<xsl:apply-templates select="." mode="ds:attr-specific-language" />
 			<xsl:variable name="language-class">
 				<xsl:apply-templates select="." mode="ds:attr-specific-language-class-value" />
 			</xsl:variable>
