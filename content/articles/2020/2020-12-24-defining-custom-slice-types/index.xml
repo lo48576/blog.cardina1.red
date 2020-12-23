@@ -1,6 +1,7 @@
 ---
 created_at: 2020-12-14T19:27:07+09:00
 published_at: 2020-12-24T05:13:05+09:00
+updated_at: 2020-12-24T05:55:01+09:00
 format: article2019
 title: "Rust で独自のスライス型や文字列型を定義する"
 tags:
@@ -393,14 +394,23 @@ To learn more, run the command again with --verbose.]]></screen>
 		<programlisting language="rust"><![CDATA[/// My custom string slice type.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct MyStr(str);]]></programlisting>
 		<programlisting language="rust"><![CDATA[/// ASCII string slice type.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct AsciiStr(str);]]></programlisting>
 		<programlisting language="rust"><![CDATA[/// ASCII string slice type.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct AsciiBytes(str);]]></programlisting>
 		<caption>型の定義例</caption>
 	</figure>
@@ -494,6 +504,16 @@ pub struct Token<S> {
 				元となった <code>str</code> と同じように <code>"hello"</code> とフォーマットしたければ、 <code>Debug</code> トレイトは<link linkend="implementing-traits--fmt">後述のように</link>自前で実装してやる必要がある。
 			</p>
 		</tip>
+		<programlisting language="rust"><![CDATA[// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]]]></programlisting>
+		<p>
+			これは最悪体験なのだが、 <code>Hash</code> と <code>PartialEq</code> の組や <code>Ord</code> と <code>PartialOrd</code> の組で一方を derive して一方を手動で実装すると、 clippy に <link xl:href="https://rust-lang.github.io/rust-clippy/master/index.html#derive_hash_xor_eq">deny で叱られる</link>。
+			これは <strong><code>#[derive(PartialEq, Hash)]</code> していても別の型への <code>PartialEq</code> 実装があると叱られる</strong>という最悪の実装なので、無効化するしかない。
+		</p>
+		<p>
+			一応 false positive の問題として<link xl:href="https://github.com/rust-lang/rust-clippy/issues/2025">上流で認識されてはいる</link>ので、そのうち改善されることが期待できる。
+		</p>
 	</section>
 
 	<section xml:id="defining-slice-types--repr-transparent">
@@ -623,12 +643,21 @@ pub struct MyStr(str);]]></programlisting>
 	<figure>
 		<programlisting language="rust"><![CDATA[/// My custom owned string type.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct MyString(String);]]></programlisting>
 		<programlisting language="rust"><![CDATA[/// Owned ASCII string type.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct AsciiString(String);]]></programlisting>
 		<programlisting language="rust"><![CDATA[/// Owned ASCII string type.
 #[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+#[allow(clippy::derive_hash_xor_eq, clippy::derive_ord_xor_partial_ord)]
 pub struct AsciiByteBuf(String);]]></programlisting>
 		<caption>書くだけ</caption>
 	</figure>
