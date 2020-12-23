@@ -1,0 +1,3336 @@
+---
+created_at: 2020-12-14T19:27:07+09:00
+published_at: 2020-12-24T05:13:05+09:00
+format: article2019
+title: "Rust で独自のスライス型や文字列型を定義する"
+tags:
+  - advent-calendar
+  - prog-rust
+kind: article
+
+excerpt: "Rust で str や Path のような独自のスライス型を定義する方法を解説する。"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2019-12-23-defining-custom-slice-types"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Rust (1.48.0) で独自のスライス型や文字列型を定義する</title>
+
+<p>
+	Rust でプログラムを書くうえで、用途や制約に応じた適切な型の定義は大変重要である。
+	たとえば Rust ではバイト列は <code>[u8]</code>、 UTF-8 文字列は <code>str</code>、OS ネイティブのエンコーディングの文字列は <code>std::ffi::OsStr</code>、パス文字列は <code>std::path::Path</code> といったように、横着すればひとつの型で済むような様々なデータに対してそれぞれの特徴に応じた型を標準で用意している。
+</p>
+<p>
+	ときに標準ライブラリで用意された型ばかりでなく、自分で専用の型を用意したいこともある。
+	たとえば「相対パスのみを保持できる型」のようなものを実装したくなるかもしれない。
+	もちろん Rust でこれは可能なのだが、 <code>str</code> のような (値として利用するときは <code>&amp;str</code> のように参照を使う) 可変長のスライスのような型は、定義したり十分な利便性を確保するのに多少のコツが必要となる。
+</p>
+<p>
+	本記事では、独自のスライス型や関係する定義の方法や理由について、実際に動く例を挙げて詳細に解説する。
+</p>
+<p>
+	あまりに詳細すぎてコード例がクッソ長いため、あとでどこかに動く状態のコードを置いておくつもり。
+	<!-- TODO -->
+</p>
+<p>
+	この記事は <link xl:href="https://qiita.com/advent-calendar/2020/rust2">Rust 2 Advent Calendar 2020</link> の23日目<footnote xml:id="footnote-23rd-in-utc" refmark-id="footnote-ref-23rd-in-utc">
+		UTC ではまだギリギリ23日なのでゆるして (オタクすぐ UTC)
+	</footnote>の記事である。
+</p>
+
+<section xml:id="preliminary">
+	<title>準備と前提知識</title>
+
+	<section xml:id="preliminary--strong-typedef">
+		<title>strong typedef</title>
+
+		<p>
+			スライス型を自前定義する意義を考えるうえで、まず strong typedef というテクニックについて説明せねばなるまい。
+			strong typedef について十分知っている読者は、このセクションを丸々読み飛ばして問題ない。
+		</p>
+		<p>
+			本来なら C++ あたりのコード例で説明するところだが、この記事は Rust での手法について説明するものなので例も Rust で書くことにする。
+			C や C++ での <code>typedef</code> に相当するものは、 Rust では <code>type</code> である<footnote xml:id="footnote-rust-typedef-and-cpp-using" refmark-id="footnote-ref-typedef-and-cpp-using">
+				Rust での <code>type</code> は型パラメータを持ったり部分特殊化などもできるため、厳密には C++ における <code>typedef</code> よりは <code>using</code> の方がより近い
+			</footnote>。
+		</p>
+
+		<section xml:id="preliminary--strong-typedef--what-is-typedef">
+			<title>typedef</title>
+
+			<p>
+			前提として、 <code>typedef</code> とはC言語や C++ で型に別名を与える構文のための予約語である。
+			<code>typedef</code> は本当に別名を用意するだけで、その性質や扱いに変化を与えることはない。
+			純粋に可読性のための存在といえる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// A type for an array index.
+type ArrayIndex = usize;
+
+fn main() {
+    let i0: usize = 42;
+
+    // `ArrayIndex` and `usize` are identical.
+    let i1: ArrayIndex = i0;
+    let _i2: usize = i1;
+}]]></programlisting>
+				<caption>Rust での <code>type</code> (C や C++ での <code>typedef</code>) は型に別名を与えるだけで、その性質には変化を与えないため、 <code>usize</code> の変数と <code>ArrayIndex</code> の変数は同じ型を持つものとして扱われる</caption>
+			</figure>
+			<p>
+				型の性質に変化を与えないため挙動は理解しやすいが、反面 typedef は新しい型を作る用途で使うことはできない。
+				あくまで別名を割り当てるだけである。
+				つまり、本来禁止したかった用法や無意味な計算が許されかねないということである。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// A type for an array index.
+type ArrayIndex = usize;
+
+fn main() {
+    let i0: ArrayIndex = 1;
+    let i1: ArrayIndex = 2;
+
+    // What does this mean?
+    let _sum: ArrayIndex = i0 + i1;
+
+    // Nonsense!
+    let _nonsense: ArrayIndex = i0 * !i1;
+}]]></programlisting>
+				<caption>別名を与えただけで型としては同一であるため、 <code>ArrayIndex</code> 型に対して <code>usize</code> から引き継いだ演算が全て使えてしまう</caption>
+			</figure>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// A type for an array index.
+type ArrayIndex = usize;
+/// A type for distance between array elements.
+type ArrayDistance = usize;
+
+fn main() {
+    let i0: ArrayIndex = 42;
+    let i1: ArrayIndex = 314;
+
+    // Meaningful.
+    let _distance: ArrayDistance = i1 - i0;
+
+    // Nonsense. Array index is offset from the beginning,
+    // but not distance between arbitrary elements.
+    let _nonsense: ArrayIndex = i1 - i0;
+}]]></programlisting>
+				<caption>同一の型である以上、意味や用途が明確に違っても別名同士は区別されない</caption>
+			</figure>
+			<p>
+				こうして「既存の型をもとにして (つまり内部表現を同一にして) 用途特化型を楽に定義したい」という夢は潰えた。
+				夢破れた人々がそれでも諦められない場合に使うのが strong typedef である。
+			</p>
+		</section>
+
+		<section xml:id="preliminary--strong-typedef--difference-and-examples">
+			<title>strong typedef の違いと例</title>
+
+			<p>
+				strong typedef とは、内部的には既存の型を使って、それでも元の型と互いに区別されるような用途特化型を定義しようという手法である。
+				例を見た方が早かろう。
+				strong typedef は Rust では以下のように (あるいは他言語でも似たような方法で) 実現される。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[use std::{cmp, ops};
+
+/// A type for an array index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct ArrayIndex(usize);
+impl ArrayIndex {
+    pub fn new(i: usize) -> Self {
+        Self(i)
+    }
+    pub fn to_usize(self) -> usize {
+        self.0
+    }
+}
+
+/// A type for distance between array elements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct ArrayDistance(usize);
+impl ArrayDistance {
+    pub fn new(i: usize) -> Self {
+        Self(i)
+    }
+    pub fn to_usize(self) -> usize {
+        self.0
+    }
+}
+
+// index + distance => index.
+impl ops::Add<ArrayDistance> for ArrayIndex {
+    type Output = Self;
+    fn add(self, distance: ArrayDistance) -> Self::Output {
+        Self(self.to_usize() + distance.to_usize())
+    }
+}
+
+// index - distance => index.
+impl ops::Sub<ArrayDistance> for ArrayIndex {
+    type Output = Self;
+    fn sub(self, distance: ArrayDistance) -> Self::Output {
+        Self(self.to_usize() - distance.to_usize())
+    }
+}
+
+// index - index => distance.
+impl ops::Sub<ArrayIndex> for ArrayIndex {
+    type Output = ArrayDistance;
+    fn sub(self, other: ArrayIndex) -> Self::Output {
+        let min = cmp::min(self, other);
+        let max = cmp::max(self, other);
+        ArrayDistance::new(max.to_usize() - min.to_usize())
+    }
+}
+
+fn main() {
+    let i0: ArrayIndex = ArrayIndex::new(42);
+    let i1: ArrayIndex = ArrayIndex::new(314);
+
+    let d0: ArrayDistance = i1 - i0;
+    let d1: ArrayDistance = i0 - i1;
+    assert_eq!(d0, d1);
+
+    // ERROR.
+    //let _sum_meaningless = i0 + i1;
+    // ERROR.
+    //let _product_meaningless = i0 * i1;
+    // If you really really want the product, you can do this.
+    let _product = i0.to_usize() * i1.to_usize();
+}]]></programlisting>
+				<caption>strong typedef で添字と距離を互いに区別される別々の型として定義し、特定の意味ある演算だけ明示的に実装した</caption>
+			</figure>
+			<p>
+				このコードは正直微妙なところがあるが<footnote xml:id="footnote-not-so-good-strong-typedef-example" refmark-id="footnote-ref-not-so-good-strong-typedef-example">
+					たとえば offset として <code>isize</code> を使うのでなく distance として <code>usize</code> を使っているところとか……
+					たぶんこんなものを定義しても実用上はあまり用途がない
+				</footnote>、例としては十分だろう。
+				<code>typedef</code> では混同できていた index と distance が strong typedef では区別されており、混同するとコンパイルが通らない。
+				<code>typedef</code> では添字同士の乗算などの一般に意味のない演算ができてしまったが、 strong typedef ではそのような演算はできない。
+			</p>
+			<p>
+				このように、 strong typedef は次のような方法によって型を定義する手法のことである。
+			</p>
+			<ol>
+				<li>
+					<phrase>
+						デフォルトでは他の型から暗黙に変換できないような型を作る。 C, C++, Rust では struct を作るのが一般的。
+					</phrase>
+					<ul>
+						<li>
+							通常この構造体はメンバ変数 (あるいはフィールド) をひとつだけ持ち、その型がベースとなる既存の型である。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<phrase>
+						新たな型の値を作る方法を用意する。
+						新たな型とベースとした型との間で相互に変換できるよう関数を用意するのが一般的。
+					</phrase>
+					<ul>
+						<li>
+							ただし、暗黙の型変換などを迂闊に実装しないよう注意すること。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<phrase>
+						新たな型について、意味のある演算子や関数などを実装する。
+						内部実装としては、ベースとした型での演算をそのまま再利用するのが一般的。
+					</phrase>
+					<ul>
+						<li>
+							たとえば <code>f64</code> をベースにした時刻型であれば、時刻同士の減算には意味があるが、加算や乗算、除算には意味がない。
+							このような場合には時刻同士の加算演算子だけを定義し、内部的には <code>f64</code> の減算を使う。
+							ただし、戻り値の型は時刻 (time point) ではなく時間 (duration) となるだろう。
+						</li>
+					</ul>
+				</li>
+			</ol>
+			<p>
+				strong typedef は極めて応用範囲の広い手法だが、たとえば以下のような利用例が考えられる。
+			</p>
+			<ul>
+				<li>
+					<phrase>
+						物理量の区別
+					</phrase>
+					<ul>
+						<li>
+							質量と距離はともに実数だが、これらを足したり混同するのは無意味なので禁じたい。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<phrase>
+						バイト列と UTF-8 文字列の区別
+					</phrase>
+					<ul>
+						<li>
+							両者はともにバイト列で表現可能だが、任意のバイト列が常に正しい UTF-8 文字列とは限らない。
+							別の言い方をすると、 UTF-8 文字列はバイト列の部分集合である。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<phrase>
+						大文字・小文字を区別しない文字列型の定義
+					</phrase>
+					<ul>
+						<li>
+							ほとんどの場合通常の文字列として振る舞うが、比較時だけ大文字と小文字を同一視するような文字列型が欲しい場合がある。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<phrase>
+						ASCII 文字しか持てない文字列型の定義
+					</phrase>
+					<ul>
+						<li>
+							ほとんどの場合通常の文字列として振る舞うが、 ASCII 文字しか持てないよう制約を加えた文字列型が欲しい場合がある。
+						</li>
+					</ul>
+				</li>
+			</ul>
+		</section>
+	</section>
+
+	<section xml:id="preliminary--slice-type">
+		<title>スライス型</title>
+
+		<p>
+			スライス型と DST についても説明しておこう。
+		</p>
+		<p>
+			Rust においては <code>[T]</code> や <code>str</code> 、 <code>std::path::Path</code> のように、値そのもののサイズ (長さ) が不定な型が存在する。
+			これらを DST (Dynamically Sized Types) と呼ぶ。
+			こういった型は <code>&amp;[T]</code> や <code>&amp;str</code> のように参照型を通して扱うことになるが、これらの参照型をスライス型と呼ぶ<footnote xml:id="footnote-slice-type-in-a-narrow-sense" refmark-id="footnote-ref-slice-type-in-a-narrow-sense">
+				もしかすると狭義のスライス型とは <code>&amp;[T]</code> のみを指すかもしれないが、注釈なしだと一般には <code>&amp;str</code> 等も含む、もう少し広義の型を含めるものと理解している
+			</footnote>。
+			スライス型の値 (すなわち参照) は低レベルで表現されるとき単なるポインタではなく、ポインタと長さの組である<footnote xml:id="footnote-fat-pointer" refmark-id="footnote-ref-fat-pointer">
+					通常のサイズ固定の型 (<code>i32</code> 等) の参照は機械語レベルでは単なるポインタ (メモリアドレス) であるが、ポインタと長さの組となると、ポインタ単体に比べてサイズが2倍となる。そのため、後者を fat pointer と呼ぶ。
+			</footnote>。
+		</p>
+		<blockquote cite="https://doc.rust-lang.org/1.48.0/std/primitive.slice.html">
+			<phrase>
+				A dynamically-sized view into a contiguous sequence, <code>[T]</code>.
+			</phrase>
+			<footer>
+				slice プリミティブ型について、<link xl:href="https://doc.rust-lang.org/1.48.0/std/primitive.slice.html">標準ライブラリのリファレンス</link>より
+			</footer>
+		</blockquote>
+		<p>
+			DST はサイズ不定であるゆえ、通常の型とは扱いが異なる。
+			典型的には、(少なくとも現状 (Rust 1.48.0) では<footnote xml:id="footnote-unsized-local-values-in-future" refmark-id="footnote-ref-unsized-local-values-in-future">
+					将来的に制限が緩和される可能性はある。詳しくは <link xl:href="https://rust-lang.github.io/rfcs/1909-unsized-rvalues.html">RFC 1909</link> 等を参照。
+			</footnote>)参照でない生の値として扱えないなどの制限がある。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[fn main() {
+    let s: str = *"foo";
+}]]></programlisting>
+			<screen><![CDATA[   Compiling playground v0.0.1 (/playground)
+error[E0277]: the size for values of type `str` cannot be known at compilation time
+ --> src/main.rs:2:9
+  |
+2 |     let s: str = *"foo";
+  |         ^ doesn't have a size known at compile-time
+  |
+  = help: the trait `Sized` is not implemented for `str`
+  = note: all local variables must have a statically known size
+  = help: unsized locals are gated as an unstable feature
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `playground`
+
+To learn more, run the command again with --verbose.]]></screen>
+			<caption>コンパイル時にサイズが定まらない DST は生で変数に入れられない</caption>
+		</figure>
+		<p>
+			このように特殊な性質を持つ DST は、定義やメソッド定義、トレイト実装等に注意や工夫が必要であるため、本記事ではそれらを紹介する。
+		</p>
+	</section>
+
+	<section xml:id="preliminary--two-kinds-of-custom-slice-types">
+		<title>2種類の独自スライス型</title>
+
+		<p>
+			本質的に大した差ではないが、お気持ちのうえで、また実装や設計のうえで独自スライス型は2種類に分類できる。
+			ひとつは、情報の欠落なしに元となる型と相互に変換できる、追加の制約なしの型。
+			もうひとつは、相互の変換で情報の欠落があったり、変換の失敗がありえるような、追加の制約付きの型である。
+		</p>
+		<p>
+			たとえば <code>str</code> は「<code>[u8]</code> で表現可能なバイト列のうち、 UTF-8 バイト列として妥当なもの」という追加の制約付きの型である。
+			<code>&amp;str</code> の値は無条件に <code>&amp;[u8]</code> に変換可能であるが、逆は失敗する可能性がある。
+		</p>
+		<p>
+			対照的に、 <code>std::path::Path</code> と <code>std::ffi::OsStr</code> が表現可能な情報の範囲は低レベルにおいては相互に等価であり、 <code>AsRef</code> を通して失敗と欠落なしに相互に変換できる。
+			<code>std::ffi::OsStr</code> 自体がとりうる値には制約があるが、これを <code>std::path::Path</code> へと変換する際に追加の制約を与えられることはない。
+		</p>
+		<p>
+			本記事では、これらの2種類の型の例として、 <code>str</code> を追加の制約なしに strong typedef した <code>MyStr</code> と、「ASCII 文字しか持っていない」という追加の制約付きの <code>AsciiStr</code> および <code>AsciiBytes</code> 型を用いる。
+				また、これらに対応する所有権付きの型 (たとえば <code>str</code> に対する <code>String</code>) として、 <code>MyString</code> 型と <code>AsciiString</code> および <code>AsciiByteBuf</code> 型も定義していく。
+		</p>
+	</section>
+</section>
+
+<section xml:id="defining-slice-types">
+	<title>スライス型の定義</title>
+
+	<p>
+		型定義の時点では、追加の制約の有無は基本的に関係ない<footnote xml:id="footnote-additional-restriction-at-definition" refmark-id="footnote-ref-additional-restriction-at-definition">
+			たとえばその追加の制約 (典型的には文法) を型パラメータとして与えるなどを考えると、定義の段階である程度の設計の調整が必要になるが、それは考えればできることなので本記事の対象範囲外である
+		</footnote>。
+	</p>
+	<figure>
+		<programlisting language="rust"><![CDATA[/// My custom string slice type.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct MyStr(str);]]></programlisting>
+		<programlisting language="rust"><![CDATA[/// ASCII string slice type.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct AsciiStr(str);]]></programlisting>
+		<programlisting language="rust"><![CDATA[/// ASCII string slice type.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct AsciiBytes(str);]]></programlisting>
+		<caption>型の定義例</caption>
+	</figure>
+	<p>
+		<code>AsciiStr</code> と <code>AsciiBytes</code> の違いは、前者が文字列との相互運用のみを前提とする単純な実装で、後者は文字列のみならずバイト列との相互変換などが扱える点である。
+		利便性で考えれば後者が良いが、実装が若干煩雑になる箇所もある。
+		よって、本記事では単純な実装で誤魔化すこともできるよう、両方のコード例を提示する。
+	</p>
+	<note>
+		<title>バイト列でも <code>str</code> で持つ理由</title>
+
+		<p>
+			たとえば「ASCII 文字列」は単なるバイト列ともいえるし、 UTF-8 文字列であるともいえる。
+			このように <code>&amp;[u8]</code> で参照することも <code>&amp;str</code> で参照することもできる場合、好みの問題ではあるが<strong>より強い制約を表明している型で持つ</strong>と多少楽かもしれない。
+		</p>
+		<p>
+			というのも、制約を外すのは簡単だが、制約を加えるには大抵実行時に検査のコストがかかるからである。
+			たとえば <code>&amp;str</code> 型は「データが妥当な UTF-8 バイト列であること」という制約を持っており、これを取り去って <code>&amp;[u8]</code> にするのは実質ノーコストで可能である。
+			しかし <code>&amp;[u8]</code> のデータを <code>&amp;str</code> に変換するには、妥当な UTF-8 バイト列であるか実行時に検査するか、あるいは確信がある場合でも unsafe な処理を行わなければいけない。
+		</p>
+		<p>
+				ただし、 <code>AsciiBytes</code> が内部的に <code>str</code> を持つのに <code>[u8]</code> との相互運用性を十分に確保しようとすると、これら3つの型の間で適切な型変換を挟む必要があるため、実装としては若干煩雑になる。
+		</p>
+		<p>
+				最後には好みの問題となるが、以上のように、制約の強い型を積極的に使うことが望ましい点と、煩雑な実装のサンプルを提示したいという理由から、本記事では <code>AsciiBytes</code> 型では <code>[u8]</code> でなく <code>str</code> 型を内部に持たせることとする。
+		</p>
+	</note>
+
+	<section xml:id="defining-slice-types--struct">
+		<title>struct</title>
+
+		<p>
+			型自体は struct で定義する。
+			例では単要素の tuple struct としたが、フィールドをひとつしか持たない通常の構造体で定義してもよい。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[/// My custom string slice type.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct MyStr {
+    inner: str,
+}]]></programlisting>
+			<caption>通常の構造体を使うこともできる</caption>
+		</figure>
+		<p>
+			この辺りは純粋に好みの問題である。
+		</p>
+		<note>
+			<title>複数フィールド</title>
+
+			<p>
+				厳密には、最後のフィールドがベースとする DST でさえあれば、最初の方に0個以上の ZST を置くことは問題がない。
+				ZST (Zero Sized Types) とは実行時にサイズが0であるような型で、典型的には <code>std::marker::PhantomData</code> などである。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// Token string slice in some syntax `S`.
+#[repr(transparent)]
+pub struct Token<S> {
+    /// Syntax.
+    _syntax: core::marker::PhantomData<fn() -> S>,
+    /// Inner data.
+    inner: str,
+}]]></programlisting>
+				<caption>最後が目的の DST (この例では <code>str</code>) でさえあれば、その前に ZST (この例では <code>PhantomData</code> があっても問題ない</caption>
+			</figure>
+			<p>
+				もっと言うと、実は DST より前のフィールドが ZST でなくても良いのだが、その場合、もはや新しく定義する型はスライス型ではなくなるため、本記事の対象範囲外である。
+				詳細は <link xl:href="https://doc.rust-lang.org/nomicon/exotic-sizes.html">Exotically Sized Types - The Rustonomicon</link> あたりを参照のこと。
+			</p>
+		</note>
+	</section>
+
+	<section xml:id="defining-slice-types--derive">
+		<title>derive</title>
+
+		<programlisting language="rust"><![CDATA[#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]]]></programlisting>
+		<p>
+			基本的に derive は何事もなく利用できるが、定義している型が DST であるゆえ、 <code>Self</code> が必要になるトレイトは使えないことに注意が必要である。
+			具体的には、 <code>Default</code>, <code>Clone</code> トレイトではメソッドの戻り値に <code>Self</code> が使われているため実装できず、 <code>Copy</code> トレイトも <code>Clone</code> を前提としているため同じく実装できない。
+				よって独自スライス型で derive 可能なトレイトは <code>Debug</code>, <code>PartialEq</code>, <code>Eq</code>, <code>PartialOrd</code>, <code>Ord</code>, <code>Hash</code> である。
+		</p>
+		<p>
+			無論、これらのトレイトは実装せずともよいし、 derive せず自分で impl しても良い。
+			たとえば「比較時に大文字と小文字が区別されない文字列型」などを作ろうとしたとき、 <code>PartialEq</code> や <code>PartialOrd</code> を derive せず手書きで実装することになるだろう。
+		</p>
+		<tip>
+			<title><code>Debug</code> トレイトは手動実装した方が幸せになれるかも</title>
+
+			<p>
+				たとえば <code>"hello"</code> という文字列から <code>MyStr</code> 型を作った場合、 <code>#[derive(Debug)]</code> しているとデバッグ出力で <code>MyStr("hello")</code> のようにフォーマットされてしまう。
+				元となった <code>str</code> と同じように <code>"hello"</code> とフォーマットしたければ、 <code>Debug</code> トレイトは<link linkend="implementing-traits--fmt">後述のように</link>自前で実装してやる必要がある。
+			</p>
+		</tip>
+	</section>
+
+	<section xml:id="defining-slice-types--repr-transparent">
+		<title><code>#[repr(transparent)]</code></title>
+
+		<programlisting language="rust"><![CDATA[#[repr(transparent)]]]></programlisting>
+		<p>
+			これが型定義で最も重要な部分である。
+			<code>#[repr(..)]</code> は型の内部表現についての指定をコンパイラに与えるものであり、たとえば「特定のアラインメントを持たねばならない」や「C言語における構造体と同等のメモリレイアウトを持たねばならない」などの指定ができる。
+			<code language="rust">#[repr(transparent)]</code> の意味は、「定義しようとしている型は、その内部の (ZST でない) 型と同じメモリレイアウトを持つ必要がある」といったところである。
+		</p>
+		<p>
+			この指定は未定義動作を防ぐために不可欠なものであり<footnote xml:id="footnote-repr-c-instead-of-repr-transparent" refmark-id="footnote-ref-repr-c-instead-of-repr-transparent">
+				<code>#[repr(transparent)]</code> が安定化される以前には、メモリレイアウトの同一性を保証する目的で <code>#[repr(C)]</code> が用いられていた。
+				現代においては、この用途では <code>#[repr(transparent)]</code> の方が適切であり、こちらを使うべきである。
+			</footnote>、決して忘れてはいけない。
+		</p>
+
+		<section xml:id="defining-slice-types--repr-transparent--why-necessary">
+			<title>なぜ <code>#[repr(transparent)]</code> が必要か</title>
+
+			<p>
+				<code language="rust">#[repr(transparent)]</code> の欠如が未定義動作を引き起こす理由を理解するには、型のメモリレイアウトを考える必要がある。
+			</p>
+			<p>
+				たとえば <code>&amp;str</code> と <code>&amp;MyStr</code> を例に考えよう。
+				<code>&amp;str</code> は、低レベルでは文字列の長さ(バイト長)と先頭文字へのポインタの組として考えることができる。
+			</p>
+			<mediaobject>
+				<img src="str-layout.svg" alt="&amp;str 型のレイアウトの例" />
+			</mediaobject>
+			<p>
+				ところが、 <code language="rust">#[repr(transparent)]</code> なしに <code language="rust">struct MyStr(str);</code> とした場合、 <code>&amp;MyStr</code> のメモリレイアウトは <code>&amp;str</code> と同じであるとは保証されない。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// My custom string slice type.
+// Note that no `#[repr(transparent)]` is specified.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MyStr(str);]]></programlisting>
+				<mediaobject>
+					<img src="mystr-possible-layout-same-as-str.svg" alt="&amp;MyStr 型は内部的に pointer の後に length を持つかもしれない" />
+				</mediaobject>
+				<mediaobject>
+					<img src="mystr-possible-layout-incompatible-with-str.svg" alt="&amp;MyStr 型は内部的に length の後に pointer を持つかもしれない" />
+				</mediaobject>
+				<mediaobject>
+					<img src="mystr-possible-layout-incompatible-with-str2.svg" alt="&amp;MyStr 型は内部的に pointer の後に length を持ち、謎のパディングも持つかもしれない" />
+				</mediaobject>
+				<caption>
+					<code>&amp;MyStr</code> の内部レイアウトは <code>&amp;str</code> と同じかもしれないし、違うかもしれない。
+					保証されている性質はごく僅かであり、ここでは役に立たない。
+				</caption>
+			</figure>
+			<p>
+				これで何が困るかというと、参照型の <code>AsRef</code> や <code>Deref</code> による型変換が安全に行えなくなってしまうのである。
+			</p>
+			<p>
+				たとえば <code>&amp;str</code> を <code>str::as_bytes()</code> で <code>&amp;[u8]</code> 型の参照にすることができるが、これは <code>&amp;str</code> と <code>&amp;[u8]</code> のメモリレイアウトが一致しているからこそ可能である。
+				参照型を変換するとき、「<code>0xff000000</code> から <code>8</code> バイトの文字列を、 <code>0xff000000</code> から <code>8</code> バイトの <code>u8</code> の配列と見做す」という解釈の切り替えが発生しているのである。
+			</p>
+			<figure>
+				<mediaobject>
+					<img src="u8-slice-layout-and-value.svg" alt="&amp;[u8] 型の値の例" />
+				</mediaobject>
+				<mediaobject>
+					<img src="str-layout-and-value.svg" alt="&amp;str 型の値の例" />
+				</mediaobject>
+				<caption>
+					<code>&amp;[u8]</code> と <code>&amp;str</code> のメモリレイアウトは一致しているため、「<code>&amp;str</code> の値をあたかも <code>&amp;[u8]</code> の値であるかのように解釈する」ことができる
+				</caption>
+			</figure>
+			<p>
+				しかし、メモリレイアウトが一致していない場合、この解釈の切り替えが不正な操作となってしまう。
+			</p>
+			<p>
+				たとえば <code>&amp;str</code> がポインタの後に長さを持っているとして、しかし <code>&amp;MyStr</code> が長さの後にポインタを持っているとする。
+				このような状況で<code>&amp;MyStr</code> を <code>&amp;str</code> に読み替えようとすると、「<code>0xff000000</code> から <code>8</code> バイトの <code>MyStr</code> 文字列を、 <code>0x00000008</code> から <code>4278190080</code> バイトの <code>str</code> の文字列と見做す」という挙動になってしまうのである。
+				この操作は未定義動作であり、不正なメモリアクセスや予期せぬコンパイル結果を発生させるおそれがある。
+			</p>
+			<figure>
+				<mediaobject>
+					<img src="mystr-incompatible-layout-and-value.svg" alt="&amp;MyStr 型の、 &amp;str と互換性のないレイアウトの例" />
+				</mediaobject>
+				<mediaobject>
+					<img src="str-layout-and-value2.svg" alt="&amp;str 型のレイアウトの例" />
+				</mediaobject>
+				<caption>
+					<code>&amp;str</code> と <code>&amp;MyStr</code> のメモリレイアウトが一致していない場合、「<code>&amp;MyStr</code> の値をあたかも <code>&amp;str</code> の値であるかのように解釈する」のは不正である
+				</caption>
+			</figure>
+			<p>
+				コンパイラは、 <code>#[repr(..)]</code> の指定されていない型のメモリレイアウトの決定について裁量を持っており、またその後方互換性も担保されない。
+				すなわち、単純に <code language="rust">struct MyStr(str);</code> などのようにしただけではメモリレイアウトの互換性は保証されないし、もしある環境のあるバージョンのコンパイラでたまたま互換性があったとしても、他の環境や別のバージョンにおいて同様に互換性があるとは限らないのである。
+			</p>
+			<p>
+					以上より、 <code language="rust">#[repr(transparent)]</code> が必要な理由は「参照型のメモリレイアウトの互換性を保証することで、参照型の読み替えによるキャストを安全に実装可能にするため」であると説明できる。
+			</p>
+			<note>
+				<title>そうは言っても、本当にメモリレイアウトを変えることがあるの？</title>
+				<p>
+					知らん。
+					<br />
+					知らないが、レイアウトを変えるに足る現実的なシナリオを妄想することはできる。
+				</p>
+				<p>
+					たとえば「<code>MyStr</code> ではとにかく長さを取得する処理が多く、中身の文字列にアクセスすることはほとんどない」というユースケースだったとしよう。
+					コンパイラやプロファイラが解析によってこのことを認識した場合、ポインタよりも長さ情報を先頭に置くことで、一部アーキテクチャにおいてアドレス計算を省略し、長さ情報へのアクセスの高速化などが可能になるかもしれない。
+				</p>
+				<p>
+					この例はあくまで妄想だが、コンパイラがそのような最適化を導入する可能性が否定されず、また他の理由によって (あるいは意味もなく) メモリレイアウトが非互換になる可能性もあるというのがポイントである。
+				</p>
+				<p>
+					保証できないことを勝手に確信してはいけない。
+				</p>
+			</note>
+		</section>
+	</section>
+</section>
+
+<section xml:id="defining-slice-types--owned-types">
+	<title>所有権付きの型の定義</title>
+
+	<p>
+		特筆すべきことはない。
+		書くだけである。
+	</p>
+	<figure>
+		<programlisting language="rust"><![CDATA[/// My custom owned string type.
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MyString(String);]]></programlisting>
+		<programlisting language="rust"><![CDATA[/// Owned ASCII string type.
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AsciiString(String);]]></programlisting>
+		<programlisting language="rust"><![CDATA[/// Owned ASCII string type.
+#[derive(Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AsciiByteBuf(String);]]></programlisting>
+		<caption>書くだけ</caption>
+	</figure>
+	<p>
+		敢えて指摘するなら、 <code>#[repr(transparent)]</code> が不要であること、 <code>Default</code>, <code>Clone</code>, <code>Copy</code> トレイトが derive 可能であることがスライス型の定義との違いである。
+	</p>
+	<note>
+		<title><code>Default</code> トレイトが本当に必要か考えること</title>
+
+		<p>
+			ここで頭を空っぽにして <code>#[derive(Default)]</code> してしまいがちなのだが、本当にそれでいいのかよく考えるべきである。
+			独自スライス型の定義という文脈では、たとえば「空でない配列のスライス型」とか「C言語の識別子であるような文字列のスライス型」みたいなものを定義したくなるかもしれない。
+			こういった場合、デフォルトとして空の配列や空文字列が生成されては全てが破綻することになる。
+		</p>
+	</note>
+</section>
+
+<section xml:id="defining-slice-methods">
+	<title>スライス型のメソッド定義</title>
+
+	<p>
+		型の定義ができたら、次は基本的な型変換を実装しよう。
+		スライス型は参照の形でしか扱えないため、中身の値をフィールドに突っ込んでやれば値を作れる sized な型とは勝手が違う。
+	</p>
+
+	<section xml:id="defining-slice-methods--new">
+		<title>値の作成</title>
+
+		<section xml:id="defining-slice-methods--new--infallible">
+			<title>追加の制約なしの型の場合</title>
+
+			<p>
+				まずは追加の制約なしの型から考えよう。
+				<link linkend="defining-slice-types--repr-transparent--why-necessary">先の節</link>で説明したように、スライス型の変換は解釈の切り替えによって行う。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[repr(transparent)]
+pub struct MyStr(str);
+
+impl MyStr {
+    #[inline]
+    #[must_use]
+    pub fn new(s: &str) -> &Self {
+        unsafe { &*(s as *const str as *const Self) }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn new_mut(s: &mut str) -> &mut Self {
+        unsafe { &mut *(s as *mut str as *mut Self) }
+    }
+}]]></programlisting>
+				<caption>内部のスライス型から変換して独自スライス型の参照を作る</caption>
+			</figure>
+			<p>
+				ここで <code>unsafe</code> は本質的に不可避であることに留意せよ。
+				また <code language="rust">#[inline]</code> と <code language="rust">#[must_use]</code> は任意だが、私は付けることにしている。
+				なぜなら関数は値の解釈の変更以外の実務を一切行わず、また副作用がないため利用しない解釈変更を行うことはナンセンスだからである。
+				(もっとも、このくらいであればわざわざ注釈を付けずとも普通に最適化で消されるが……)
+			</p>
+			<p>
+				これらの関数は、後に <code>From</code> トレイトや <code>AsRef</code> トレイトを実装する際に利用できる。
+			</p>
+		</section>
+
+		<section xml:id="defining-slice-methods--new--fallible">
+			<title>追加の制約付きの型の場合</title>
+
+			<section xml:id="defining-slice-methods--new--fallible--error-type">
+				<title>エラー型</title>
+
+				<p>
+					追加の制約があって値の変換が失敗しうる場合、多少の下準備が必要になる。
+					まずは検査を行う関数と、そこから返すエラー型を用意する。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[/// Error for conversion from bytes to ASCII string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AsciiError {
+    valid_up_to: usize,
+    invalid_byte: u8,
+}
+
+impl AsciiError {
+    pub fn valid_up_to(&self) -> usize {
+        self.valid_up_to
+    }
+
+    pub fn invalid_byte(&self) -> u8 {
+        self.invalid_byte
+    }
+}
+
+impl core::fmt::Display for AsciiError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "invalid ASCII character {:#02x?} found at index {}",
+            self.invalid_byte, self.valid_up_to
+        )
+    }
+}
+
+impl std::error::Error for AsciiError {}]]></programlisting>
+					<caption>
+						エラー型。
+						エラーの出たバイト位置と、その場所の値を持つ。
+						<link xl:href="https://doc.rust-lang.org/1.48.0/std/str/struct.Utf8Error.html"><code>std::str::Utf8Error</code></link> を参考にした。
+					</caption>
+				</figure>
+			</section>
+
+			<section xml:id="defining-slice-methods--new--fallible--only-from-inner">
+				<title>内部の型のみから作る場合</title>
+
+				<p>
+					エラー型ができたら、これを使って検査が書ける。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl AsciiStr {
+    fn validate(s: &str) -> Result<(), AsciiError> {
+        match s.bytes().enumerate().find(|(_pos, byte)| !byte.is_ascii()) {
+            Some((pos, byte)) => Err(AsciiError {
+                valid_up_to: pos,
+                invalid_byte: byte,
+            }),
+            None => Ok(()),
+        }
+    }
+}]]></programlisting>
+					<caption>
+						与えられたデータが型の制約を満たすか確認する。
+						エラー型をどこまで詳細にするかにもよるが、ちょっとしたパーサのようなものを書くことになる。
+					</caption>
+				</figure>
+				<p>
+					この検査はちょっとしたパーサのようなものになるかもしれないが、大事なのはエラーかそうでないか、エラーならどのようなエラーか、それだけである。
+					よって戻り値の型は <code language="rust"><![CDATA[Result<(), Error>]]></code> のようなものになる。
+				</p>
+				<note>
+					<title>検査関数の戻り値の型</title>
+
+					<p>
+						ここで、検査関数が <code language="rust"><![CDATA[Result<&str, Error>]]></code> を返すと便利なのではと考える人もいるかもしれない。
+						これでも問題ないといえば問題ないのだが、 <code>&amp;mut MyStr</code> のような型を作ろうとしたとき <code>Result</code> が入力文字列を借用しっぱなしになっているのは少々鬱陶しい。
+						そうでなくとも検査関数は入力の所有権を消費 (consume) しないため、実際は参照を Ok の値として返しても総合的には大したメリットにならない場合が多いだろう。
+					</p>
+				</note>
+				<p>
+					さて、検査ができるようになったら次は値の変換である。
+					とりあえず検査なしの単純な (必ずしも安全でない) 型変換から書こう。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl AsciiStr {
+    /// Creates a new ASCII string slice from the given UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn new_unchecked(s: &str) -> &Self {
+        &*(s as *const str as *const Self)
+    }
+
+    /// Creates a new mutable ASCII string slice from the given mutable UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn new_unchecked_mut(s: &mut str) -> &mut Self {
+        &mut *(s as *mut str as *mut Self)
+    }
+}]]></programlisting>
+					<caption>
+						追加の制約のない場合と同じように実装するが、今回は関数自体は unsafe であり、関数名も <code>_unchecked</code> を含む
+					</caption>
+				</figure>
+				<p>
+					<link xl:href="https://rust-lang.github.io/api-guidelines/documentation.html#function-docs-include-error-panic-and-safety-considerations-c-failure">Rust API guidelines</link> では、unsafe な関数において、呼び出し側が守るべき不変条件のすべてを doc comment の Safety セクションで提示することを推奨している。
+					利用者が安全に関数を呼び出すために不可欠な情報のため、必ず doc comment で説明するべきである。
+				</p>
+				<note>
+					<title>debug_assert</title>
+
+					<p>
+						ユーザを信用せず <code>new_unchecked</code> の不正な利用にも気付きたいということであれば、ここに <code>debug_assert</code> マクロを突っ込んでデバッグビルド時にだけ強制的に検査を行うという手がある。
+					</p>
+					<programlisting language="rust"><![CDATA[impl AsciiStr {
+    /// Creates a new ASCII string slice from the given UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The given string should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    #[inline]
+    #[must_use]
+    pub unsafe fn new_unchecked(s: &str) -> &Self {
+        debug_assert!(
+            Self::validate(s).is_ok(),
+            "Input should be valid ASCII string, but was not: input={:?}",
+            s
+        );
+        &*(s as *const str as *const Self)
+    }
+}]]></programlisting>
+					<p>
+						ただしこれだと、後述の安全な <code>new</code> で二重に検査が行われる。
+						これが気になるようなら、関数を分離するという手もある。
+						そこまですべきかは微妙かもしれないが。
+					</p>
+					<programlisting language="rust"><![CDATA[impl AsciiStr {
+    /// Creates a new ASCII string slice from the given UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The given string should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    #[inline]
+    #[must_use]
+    unsafe fn new_really_unchecked(s: &str) -> &Self {
+        &*(s as *const str as *const Self)
+    }
+
+    /// Creates a new ASCII string slice from the given UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The given string should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    #[must_use]
+    pub unsafe fn new_unchecked(s: &str) -> &Self {
+        debug_assert!(
+            Self::validate(s).is_ok(),
+            "Input should be valid ASCII string, but was not: input={:?}",
+            s
+        );
+        Self::new_really_unchecked(s)
+    }
+}]]></programlisting>
+				</note>
+				<p>
+					検査なしの変換が実装できたら、次は検査ありの安全な変換である。
+					戻り値の型に注意して実装する。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl AsciiStr {
+    pub fn new(s: &str) -> Result<&Self, AsciiError> {
+        match Self::validate(s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::new_unchecked(s)
+            }),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn new_mut(s: &mut str) -> Result<&mut Self, AsciiError> {
+        match Self::validate(s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::new_unchecked_mut(s)
+            }),
+            Err(e) => Err(e),
+        }
+    }
+}]]></programlisting>
+					<caption>
+						制約を満たす文字列であれば読み替える。制約を満たさなければ、読み替えずエラーとする。
+					</caption>
+				</figure>
+				<p>
+					これで、効率的だが安全性の検査がスキップされるものと、検査が必ず強制される安全なものが実装できた。
+				</p>
+				<note>
+					<title>must_use は不要</title>
+
+					<p>
+						戻り値型が <code>Result</code> である場合、型の方に <code>#[must_use]</code> 指定が付いているため、関数側で改めて指定する必要はない。
+						むしろ指定すると clippy に <link xl:href="https://rust-lang.github.io/rust-clippy/master/#double_must_use"><code>clippy::double_must_use</code></link> lint で無意味だと警告される。
+					</p>
+				</note>
+				<p>
+					これらの関数は、後に <code>TryFrom</code> トレイトを実装する際に利用できる。
+				</p>
+			</section>
+
+			<section xml:id="defining-slice-methods--new--fallible--from-non-inner-type">
+				<title>内部の型と異なる型から作る場合</title>
+
+				<p>
+					ASCII 文字列はバイト列として扱いたい場合も多いだろう。
+					そこで <code>AsciiBytes</code> では、内部的には UTF-8 の <code>str</code> 型で保持しつつ、値は <code>&amp;[u8]</code> からも作れるようにしよう。
+				</p>
+				<p>
+					まず、検査では <code>&amp;str</code> でなく <code>&amp;[u8]</code> を受け取る。
+					<code>&amp;str</code> はノーコストで <code>&amp;[u8]</code> に変換できるから、これは <code>&amp;str</code> から値を作りたいときにも使える。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[#[repr(transparent)]
+pub struct AsciiBytes(str);
+
+impl AsciiBytes {
+    fn validate_bytes(s: &[u8]) -> Result<(), AsciiError> {
+        match s
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_pos, byte)| !byte.is_ascii())
+        {
+            Some((pos, byte)) => Err(AsciiError {
+                valid_up_to: pos,
+                invalid_byte: byte,
+            }),
+            None => Ok(()),
+        }
+    }
+}]]></programlisting>
+					<caption>
+						検査の関数。
+						<link linkend="defining-slice-methods--new--fallible--only-from-inner">内側の型のみから作る場合</link>との違いは、引数の型と、イテレータでのバイト列の取り出し方だけである。
+					</caption>
+				</figure>
+				<p>
+					続けて unsafe な値の作成。
+					一度 <code>&amp;[u8]</code> を <code>&amp;str</code> に変換してから、いつもの変換をかける。
+					ASCII 文字列は明らかに妥当な UTF-8 バイト列でもあるため、 <code>core::str::from_utf8()</code> を呼び出すことができる。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl AsciiBytes {
+    /// Creates a new ASCII string slice from the given bytes.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
+        // SAFETY: This is safe because ASCII string is a valid UTF-8 sequence.
+        let s = core::str::from_utf8_unchecked(bytes);
+
+        &*(s as *const str as *const Self)
+    }
+
+    /// Creates a new mutable ASCII string slice from the given mutable bytes.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn new_unchecked_mut(bytes: &mut [u8]) -> &mut Self {
+        // SAFETY: This is safe because ASCII string is a valid UTF-8 sequence.
+        let s = core::str::from_utf8_unchecked_mut(bytes);
+
+        Self::from_mut_str_unchecked(s)
+    }
+
+    /// Creates a new mutable ASCII string slice from the given mutable bytes.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes should consists of only ASCII characters.
+    /// If this constraint is violated, undefined behavior results.
+    unsafe fn from_mut_str_unchecked(s: &mut str) -> &mut Self {
+        &mut *(s as *mut str as *mut Self)
+    }
+}]]></programlisting>
+					<caption>
+						バイト列を受け取る。
+						<code>&amp;[u8]</code> を一度 <code>&amp;str</code> に変換して、段階的に <code>&amp;AsciiBytes</code> へと変換する。
+					</caption>
+				</figure>
+				<p>
+					<code>AsciiBytes</code> の内部の型は <code>str</code> であるから、横着して一気にキャストせず、 <code>core::str::from_utf8_unchecked()</code> 等で <code>&amp;[u8]</code> を一度 <code>&amp;str</code> に変換したのちそれを <code>&amp;AsciiBytes</code> に変換する。
+				</p>
+				<p>
+					<code>from_mut_str_unchecked()</code> を別のメソッドとして分離したのは、<link linkend="defining-owned-type-methods--fallible--utility">あとで使う</link>ためである。
+					使う予定がないなら <code>new_unchecked_mut()</code> 内で全てを済ませてもよい。
+				</p>
+				<p>
+					あとは safe な値の作成。
+					今回は <code>&amp;[u8]</code> と <code>&amp;str</code> の両方を受け取れるよう、 <code><![CDATA[AsRef<[u8]>]]></code> を使うことにしよう。
+				</p>
+				<programlisting language="rust"><![CDATA[impl AsciiBytes {
+    fn from_bytes(s: &[u8]) -> Result<&Self, AsciiError> {
+        match Self::validate_bytes(s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::new_unchecked(s)
+            }),
+            Err(e) => Err(e),
+        }
+    }
+
+    #[inline]
+    pub fn new<T: ?Sized + AsRef<[u8]>>(s: &T) -> Result<&Self, AsciiError> {
+        Self::from_bytes(s.as_ref())
+    }
+
+    pub fn from_bytes_mut(s: &mut [u8]) -> Result<&mut Self, AsciiError> {
+        match Self::validate_bytes(s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::new_unchecked_mut(s)
+            }),
+            Err(e) => Err(e),
+        }
+    }
+
+    #[inline]
+    pub fn new_mut<T: ?Sized + AsMut<[u8]>>(s: &mut T) -> Result<&mut Self, AsciiError> {
+        Self::from_bytes_mut(s.as_mut())
+    }
+
+    #[inline]
+    pub fn from_mut_str(s: &mut str) -> Result<&mut Self, AsciiError> {
+        // SAFETY: `AsciiBytes` guarantees that the string is an ASCII string,
+        // and ASCII string is valid UTF-8 sequence.
+        let bytes = unsafe { s.as_bytes_mut() };
+
+        Self::from_bytes_mut(bytes)
+    }
+}]]></programlisting>
+				<p>
+					敢えて <code>new()</code> で完結させず <code>.as_ref()</code> だけ済ませて <code>from_bytes()</code> に処理を移譲しているのは、バイナリサイズやコンパイル時間増大の回避のためである。
+					もしこれらを <code>new()</code> 内で済ませてしまうと、 <code>Self::validate_bytes()</code> を呼び出すような <code>new</code> 関数の実体が <code>T</code> 型の種類分だけ作られ、それぞれについて最適化やバイナリ生成が行われることになるだろう。
+						このようなコード重複は無駄であるため、本命の処理を使う前に型を合流させてしまうのである。
+						このような手動での事前の単一化 (monomorphization) は <link xl:href="https://raphlinus.github.io/rust/2019/08/21/rust-bloat.html#use-polymorphism-sparingly">コンパイル時間の短縮と生成されるバイナリの縮小に</link><link xl:href="https://llogiq.github.io/2019/05/18/momo.html">貢献することが知られている</link>。
+				</p>
+				<p>
+					型パラメータ <code>T</code> には <code>[u8]</code> 等のサイズ不定な DST が来ることを想定しているため、 <code>T: ?Sized</code> でサイズ不定でも構わないと明示する必要がある。
+				</p>
+				<p>
+					<code>from_mut_str()</code> を <code>new_mut()</code> と別で用意しているのは、 <code>str</code> が <code><![CDATA[AsMut<str>]]></code> を実装していないからである<footnote xml:id="footnote-lack-of-reference-conversion-trait-impls" refmark-id="footnote-ref-lack-of-reference-conversion-trait-impls">
+						実はこういったトレイトの実装抜けは、たまに発見されては実装が追加されたりなどしている。
+						参照の変換に使われるトレイトは <code>AsRef</code>, <code>AsMut</code>, <code>Deref</code>, <code>DerefMut</code>, <code>From</code>, <code>Borrow</code>, <code>BorrowMut</code> などなど実に多くの種類がある。
+							そのうえ <code>&amp;String</code> や <code>&amp;mut str</code> のような微妙な型は基本的に使われない (<code>&amp;str</code> や <code>&amp;mut String</code> がよく使われる) ため、「誰も困っていないので修正されない」といったことになりがちで、 <code><![CDATA[AsMut<str> for str]]></code> もそういった見落としのひとつである。
+					</footnote>。
+					受け付ける型と内部の型が一致しない場合、こういう面倒が増えるので多少の覚悟が必要である。
+				</p>
+			</section>
+		</section>
+	</section>
+
+	<section xml:id="defining-slice-methods--as-inner">
+		<title>元の型へのキャスト</title>
+
+		<p>
+			元の型へのキャストは基本的に失敗しないため、 safe かつ単純に書ける。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl MyStr {
+    #[inline]
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_mut_str(&mut self) -> &mut str {
+        &mut self.0
+    }
+}]]></programlisting>
+			<caption>内部のスライス型への変換は、単純にフィールドを参照するだけである</caption>
+		</figure>
+		<p>
+			ここで注意すべきなのは、<strong>元の型に追加の制約を加えた型の場合、元の型への可変参照を safe に返してはいけない</strong> ということである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl AsciiStr {
+    #[inline]
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Converts a mutable ASCII string slice into a mutable UTF-8 string slice.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the content of the slice is valid ASCII string before the
+    /// borrow ends and the underlying `AsciiStr` is used.
+    ///
+    /// Use of an `AsciiStr` whose contents are not valid ASCII characters is undefined behavior.
+    #[inline]
+    #[must_use]
+    pub unsafe fn as_mut_str(&mut self) -> &mut str {
+        &mut self.0
+    }
+}]]></programlisting>
+			<caption><code>as_mut_str</code> が unsafe であることに注目</caption>
+		</figure>
+		<p>
+			<code>AsciiStr</code> は値の作成や編集の際に適切な検査を行うことで <code>str</code> への追加の制約を遵守する必要がある。
+			しかし、内部の <code>&amp;mut str</code> を直接取り出してユーザが編集を行うと、 <code>AsciiStr</code> 型がその内容を検査することはできなくなる<footnote xml:id="footnote-ensuring-validity-after-arbitrary-modification" refmark-id="footnote-ref-ensuring-validity-after-arbitrary-modification">
+				もちろん、 <code>AsciiStr</code> があらゆる処理の前に値の妥当性を検査し、不正な値であれば panic 等することで未定義動作を阻止するという実装は可能である。
+				しかしこのような実装ではどのような処理の前にも必ず検査をする必要があり、検査コストが軽くない場合にそのようなことをすると大変ありがたくない。
+				このような場合、ドキュメントと <code>unsafe</code> で明示したうえで「約束守らなかったら UB な！」としてしまうのが定石である。
+			</footnote>。
+			そのため、編集が完了して値へのコントロールが <code>AsciiStr</code> へと戻ってきた時点で内容が妥当なものであることを条件として、 unsafe な関数として内部データへのアクセスを提供するのが一般的である。
+			たとえば <code>str</code> は unsafe な <link xl:href="https://doc.rust-lang.org/1.48.0/std/primitive.str.html#method.as_bytes_mut"><code>str::as_bytes_mut()</code></link> によって内部の <code>&amp;mut [u8]</code> へのアクセスを提供している。
+		</p>
+		<p>
+			これらの関数は、後に <code>AsRef</code> トレイト、 <code>Deref</code> トレイト、 <code>From</code> トレイト等を実装する際に利用できる。
+		</p>
+		<p>
+			<code>AsciiBytes</code> 型の実装例は <code>AsciiStr</code> のものと同様になるので省略する。
+		</p>
+	</section>
+</section>
+
+<section xml:id="defining-owned-type-methods">
+	<title>所有権付きの型のメソッド定義</title>
+
+	<section xml:id="defining-owned-type-methods--infallible">
+		<title>追加の制約なしの場合</title>
+
+		<p>
+			やるだけ。
+			やろう。
+		</p>
+
+		<figure>
+			<programlisting language="rust"><![CDATA[pub struct MyString(String);
+
+impl MyString {
+    #[inline]
+    #[must_use]
+    pub fn new(s: String) -> Self {
+        Self(s)
+    }
+}]]></programlisting>
+			<caption>自明</caption>
+		</figure>
+		<p>
+			ついでに、のちのちトレイト定義で使うための便利メソッドも用意しておこう。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl MyString {
+    #[inline]
+    #[must_use]
+    pub fn as_my_str(&self) -> &MyStr {
+        MyStr::new(self.0.as_str())
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_my_str_mut(&mut self) -> &mut MyStr {
+        MyStr::new_mut(self.0.as_mut_str())
+    }
+}]]></programlisting>
+			<caption>のちのち便利</caption>
+		</figure>
+		<p>
+			もしユーザに公開するつもりがなければ、 <code>pub</code> でなくプライベートなメソッドにしておこう。
+			普通は (<code>String::as_str()</code> がそうであるように) 公開してしまうものだと思うが、たとえば <code>AsRef</code> や <code>Deref</code> 経由で変換を提供することもできるので、公開が必須というわけでもない。
+		</p>
+	</section>
+
+	<section xml:id="defining-owned-type-methods--fallible">
+		<title>追加の制約付きの場合</title>
+
+		<p>
+			制約がある場合、エラー型については多少の工夫の余地がある。
+		</p>
+
+		<section xml:id="defining-owned-type-methods--fallible--monomorphic">
+			<title>内部の型からしか作成を許さない場合</title>
+
+			<p>
+				内部の型からしか作成を許さない単純なインターフェースにする場合、まずエラー型がこのようになる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[derive(Debug, Clone)]
+pub struct FromStringError {
+    source: String,
+    error: AsciiError,
+}
+
+impl FromStringError {
+    #[inline]
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.source
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn into_string(self) -> String {
+        self.source
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn ascii_error(&self) -> AsciiError {
+        self.error
+    }
+}
+
+impl core::fmt::Display for FromStringError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl std::error::Error for FromStringError {}]]></programlisting>
+				<caption>
+					エラー型。
+					<link xl:href="https://doc.rust-lang.org/1.48.0/std/string/struct.FromUtf8Error.html"><code>std::string::FromUtf8Error</code></link> 型が参考になる。
+				</caption>
+			</figure>
+			<p>
+				<code>AsciiString</code> の作成に失敗した場合に、元となる値の所有権を消費せずエラーに含めて返す (この例では <code>into_string()</code> で取り出せるようにする) というのがポイントである。
+				これによって、「もし <code>AsciiString</code> でなかったらアルファベットへの変換をかけて、改めて作成を試みる」のようなことが追加のアロケーションなしで可能になる。
+			</p>
+			<p>
+				このエラー型を使って変換を書く。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[pub struct AsciiString(String);
+
+impl AsciiString {
+    /// Creates a new `AsciiString` from the given string.
+    ///
+    /// # Safety
+    ///
+    /// The given string must be an ASCII string.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn new_unchecked(s: String) -> Self {
+        Self(s)
+    }
+
+    pub fn new(s: String) -> Result<Self, FromStringError> {
+        match AsciiStr::validate(&s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::new_unchecked(s)
+            }),
+            Err(e) => Err(FromStringError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}]]></programlisting>
+				<caption>書くだけ</caption>
+			</figure>
+			<p>
+				面白さの欠片もないが、 <strong><code>new_unchecked(s: &amp;String)</code> を unsafe にする</strong> のは大変重要である。
+				<code>Self(s)</code> 自体は unsafe なしで書ける処理であるが、ここで渡された <code>s</code> を無条件に受け入れてよいわけではないことに留意しなければならない。
+				もし <code>s</code> が ASCII 文字列でなかった場合、不正な <code>AsciiString</code> を作り未定義動作を誘発することになりかねないため、検査なしでそのような危険な処理を行うこの関数は unsafe なのである。
+			</p>
+			<p>
+				他にポイントがあるとすれば、 <code>AsciiStr::validate(&amp;s)</code> のように検証をスライス型の方に移譲しているのと、エラー値の作成で新しく作ったエラー型の方を作っているくらいだろうか。
+			</p>
+		</section>
+
+		<section xml:id="defining-owned-type-methods--fallible--polymorphic">
+			<title>内部の型以外からの作成も認める場合</title>
+
+			<p>
+				複数の型の値からの作成を認める場合、元となる値をエラーに含めて返すためには多相なエラー型が必要となる。
+				名前も <code>FromStringError</code> では string 以外から作ろうとしたとき微妙な感じなので、 <code>CreationError</code> のような一般的な名前にしよう。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[derive(Debug, Clone)]
+pub struct CreationError<T> {
+    source: T,
+    error: AsciiError,
+}
+
+impl<T> CreationError<T> {
+    #[inline]
+    #[must_use]
+    pub fn source(&self) -> &T {
+        &self.source
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn into_source(self) -> T {
+        self.source
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn ascii_error(&self) -> AsciiError {
+        self.error
+    }
+}
+
+impl<T> core::fmt::Display for CreationError<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl<T: core::fmt::Debug> std::error::Error for CreationError<T> {}]]></programlisting>
+				<caption>
+					退屈な実装。
+					<link linkend="defining-owned-type-methods--fallible--monomorphic">前述</link>の <code>FromStringError</code> とほぼ同じである。
+				</caption>
+			</figure>
+			<p>
+				値の作成では、 <code>AsciiBytes::new_unchecked()</code> と同様、 <code><![CDATA[Vec<u8>]]></code> を一度 <code>String</code> を経由して <code>AsciiByteBuf</code> に変換する。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[pub struct AsciiByteBuf(String);
+
+impl AsciiByteBuf {
+    /// Creates a new `AsciiByteBuf` from the given string.
+    ///
+    /// # Safety
+    ///
+    /// The given string must be an ASCII string.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn from_string_unchecked(s: String) -> Self {
+        Self(s)
+    }
+
+    /// Creates a new `AsciiByteBuf` from the given bytes.
+    ///
+    /// # Safety
+    ///
+    /// The given bytes must be an ASCII string.
+    /// If this constraint is violated, undefined behavior results.
+    pub unsafe fn from_bytes_unchecked(bytes: Vec<u8>) -> Self {
+        // SAFETY: `bytes` must be an ASCII string, and an ASCII string is
+        // also a valid UTF-8 string.
+        let s = String::from_utf8_unchecked(bytes);
+
+        Self(s)
+    }
+
+    pub fn new<T: Into<Vec<u8>> + AsRef<[u8]>>(s: T) -> Result<Self, CreationError<T>> {
+        match AsciiStr::validate_bytes(s.as_ref()) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: This is safe because the string is successfully validated.
+                Self::from_bytes_unchecked(s.into())
+            }),
+            Err(e) => Err(CreationError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}]]></programlisting>
+				<caption>そっすね</caption>
+			</figure>
+			<p>
+				<code>new()</code> の引数となる型には、最終的に <code><![CDATA[Vec<u8>]]></code> にするための <code><![CDATA[Into<Vec<u8>>]]></code> と、検査で必要な <code>&amp;mut [u8]</code> を取り出すための <code><![CDATA[AsRef<[u8]>]]></code> の trait bound が必要である。
+			</p>
+		</section>
+
+		<section xml:id="defining-owned-type-methods--fallible--utility">
+			<title>便利メソッド</title>
+
+			<p>
+				のちのちトレイト実装で使うため、やはり便利メソッドも実装しておく。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsciiString {
+    #[inline]
+    #[must_use]
+    pub fn as_ascii_str(&self) -> &AsciiStr {
+        unsafe {
+            // SAFETY: `self` is an ASCII string.
+            AsciiStr::new_unchecked(self.0.as_str())
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_ascii_str_mut(&mut self) -> &mut AsciiStr {
+        unsafe {
+            // SAFETY: `self` is an ASCII string.
+            AsciiStr::new_unchecked_mut(self.0.as_mut_str())
+        }
+    }
+}]]></programlisting>
+				<caption>
+					所有権付きの型から、所有権なしの独自スライス型を取り出す
+				</caption>
+			</figure>
+			<p>
+				いきなり <code>AsciiString</code> を <code>AsciiStr</code> にするのではなく、 <code>String</code> と <code>&amp;str</code> を経由する。
+				<code>self.0</code> で <code>String</code> を取り出し、 <code>.as_str()</code> で <code>&amp;str</code> にして、最後に <code>AsciiStr::new_unchecked</code> で <code>&amp;AsciiStr</code>を得る。
+			</p>
+			<p>
+				ほとんど同じになるが、一応 <code>AsciiBytes</code> の実装も載せておこう。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsciiByteBuf {
+    #[inline]
+    #[must_use]
+    pub fn as_ascii_bytes(&self) -> &AsciiBytes {
+        unsafe {
+            // SAFETY: `self` is an ASCII string.
+            AsciiBytes::new_unchecked(self.0.as_str().as_bytes())
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_ascii_bytes_mut(&mut self) -> &mut AsciiBytes {
+        unsafe {
+            // SAFETY: `self` is an ASCII string.
+            AsciiBytes::from_mut_str_unchecked(self.0.as_mut_str())
+        }
+    }
+}]]></programlisting>
+				<caption>
+					<code>AsciiStr</code> での例と違うのは、 <code>AsciiStr::new_unchecked_mut</code> の代わりに <code>AsciiBytes::from_mut_str_unchecked()</code> を使っている点だけである。
+				</caption>
+			</figure>
+			<p>
+				このような「独自型と別の型の間で直接変換が難しい場合、内部の型を経由して多段階で変換を行う」という工夫は、以後のトレイト実装でも必要になる場面がある。
+			</p>
+		</section>
+	</section>
+</section>
+
+
+<section xml:id="implementing-traits">
+	<title>トレイト実装</title>
+
+	<section xml:id="implementing-traits--from">
+		<title><code>From</code>, <code>TryFrom</code></title>
+
+		<p>
+			説明するまでもないが、値の作成や変換に用いるトレイトである。
+		</p>
+		<note>
+			<title><code>TryFrom</code> は<time datetime="2020-12-23">2020年12月</time> (Rust 1.48.0) 時点で prelude 入りしていない</title>
+
+			<p>
+				以後のコード例ではあたかも <code>TryFrom</code> が直接使えるかのように書いているが、 <code>TryFrom</code> は (<code>From</code> 等と違って) 未だ <link xl:href="https://doc.rust-lang.org/1.48.0/std/prelude/index.html">prelude</link> 入りしていない。
+				暗黙に <code>use core::convert::TryFrom;</code> しているものと考えてほしい。
+			</p>
+		</note>
+		<tip>
+			<title>可能なら <code>Into</code> よりも常に <code>From</code> の実装を優先すべし</title>
+
+			<p>
+				<code><![CDATA[From<T> for U]]></code> が実装された型 <code>T</code> と <code>U</code> について、 <code><![CDATA[Into<U> for T]]></code> は自動的に実装される。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[// From implies Into
+#[stable(feature = "rust1", since = "1.0.0")]
+impl<T, U> Into<U> for T
+where
+    U: From<T>,
+{
+    fn into(self) -> U {
+        U::from(self)
+    }
+}]]></programlisting>
+				<caption>
+					<link xl:href="https://github.com/rust-lang/rust/blob/7eac88abb2e57e752f3302f02be5f3ce3d7adfb4/library/core/src/convert/mod.rs#L538-L547">Rust 1.48.0 における、 <code>From</code> から自動的に発生する <code>Into</code> の実装</link>
+				</caption>
+			</figure>
+			<p>
+				つまり <code><![CDATA[From<T> for U]]></code> さえ実装しておけば、 <code><![CDATA[U: From<T>]]></code> と <code><![CDATA[T: Into<U>]]></code> の両方に対応できるのである。
+			</p>
+			<p>
+				一方 <code><![CDATA[Into<U> for T]]></code> を実装してしまうと、 <code><![CDATA[From<T> for U]]></code> を実装することができない。
+				なぜなら、これを実装すると、先に挙げた汎用実装により生成される <code>Into</code> の実装と手動の <code>Into</code> 実装が競合するからである。
+				つまり、 <code>Into</code> を手動で実装した型の組について、対応する <code>From</code> 実装が存在できないということになる。
+				ゆえに <code>From</code> と <code>Into</code> の両方が使えるよう、手動で実装するのは可能な場合常に <code>From</code> にするべきである。
+				(逆に trait bound として使うときは、 <code>From</code> よりも <code>Into</code> トレイトを使う方が望ましい。)
+			</p>
+			<p>
+				<code>Into</code> を手動で実装する必要があるのは、 <link xl:href="https://qnighy.hatenablog.com/entry/2017/07/20/220000">orphan rule</link> 絡みの部分で、主に多相型を使っている場合などに発生する一部の状況のみである。
+				<code>From</code> を実装しようとしてコンパイルエラーでどうしようもなくなれば自然とそのタイミングがわかるので、そうなってから <code>Into</code> の実装を試みるのでも遅くはない。
+			</p>
+		</tip>
+
+		<section xml:id="implementing-traits--from--infallible-creation">
+			<title>追加の制約なしでの値の作成</title>
+
+			<p>
+				まず手始めに、 <code>new()</code> 相当のものから実装していこう。
+			</p>
+
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> From<&'a str> for &'a MyStr {
+    #[inline]
+    fn from(s: &'a str) -> Self {
+        MyStr::new(s)
+    }
+}
+
+impl<'a> From<&'a mut str> for &'a mut MyStr {
+    #[inline]
+    fn from(s: &'a mut str) -> Self {
+        MyStr::new_mut(s)
+    }
+}]]></programlisting>
+				<programlisting language="rust"><![CDATA[impl From<String> for MyString {
+    #[inline]
+    fn from(s: String) -> Self {
+        Self::new(s)
+    }
+}
+
+impl From<&str> for MyString {
+    #[inline]
+    fn from(s: &str) -> Self {
+        Self::new(s.to_owned())
+    }
+}]]></programlisting>
+				<caption>型を見れば当然のもの</caption>
+			</figure>
+			<p>
+				<code>'a</code> が多いが、残念ながら明示する必要があるので諦めて書こう。
+				それから、 <code>&amp;str</code> など独自スライス型の内部の型からの作成もあとで使いたくなることがあるため、実装しておくのがよい。
+				<code>&amp;mut str</code> などからの変換も実装しておくと便利かもしれないが、そこはお好みである。
+				ちなみに <link xl:href="https://doc.rust-lang.org/1.48.0/std/string/struct.String.html#impl-From%3C%26%27_%20mut%20str%3E"><code><![CDATA[From<&mut str> for String]]></code></link> は割と最近 (Rust 1.44.0) になって実装が追加された。
+			</p>
+		</section>
+
+		<section xml:id="implementing-traits--from--fallible-creation">
+			<title>追加の制約付きでの値の作成</title>
+
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> TryFrom<&'a str> for &'a AsciiStr {
+    type Error = AsciiError;
+
+    #[inline]
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        AsciiStr::new(s)
+    }
+}
+
+impl<'a> TryFrom<&'a mut str> for &'a mut AsciiStr {
+    type Error = AsciiError;
+
+    #[inline]
+    fn try_from(s: &'a mut str) -> Result<Self, Self::Error> {
+        AsciiStr::new_mut(s)
+    }
+}]]></programlisting>
+				<caption>スライス型からの変換の実装</caption>
+			</figure>
+			<p>
+				またしても <code>'a</code> が多いが、残念ながら明示する必要があるので諦めて書こう。
+				<code>AsciiBytes</code> 用の実装はほぼ同じなので省略。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl TryFrom<String> for AsciiString {
+    type Error = FromStringError;
+
+    #[inline]
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}
+
+impl TryFrom<&str> for AsciiString {
+    type Error = AsciiError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        AsciiStr::new(s).map(ToOwned::to_owned)
+    }
+}]]></programlisting>
+				<caption><code>String</code> のみを受け付ける版の実装</caption>
+			</figure>
+			<p>
+				型パラメータがない場合、かなり単純。
+				特に言うべきことはない。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<T: Into<Vec<u8>> + AsRef<[u8]>> TryFrom<T> for AsciiString {
+    type Error = CreationError<T>;
+
+    #[inline]
+    fn try_from(s: T) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}]]></programlisting>
+				<screen role="terminal"><![CDATA[error[E0119]: conflicting implementations of trait `std::convert::TryFrom<_>` for type `ascii_bytes::owned::AsciiByteBuf`:
+   --> src/ascii_bytes.rs:241:5
+    |
+241 |     impl<T: Into<Vec<u8>> + AsRef<[u8]>> TryFrom<T> for AsciiByteBuf {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: conflicting implementation in crate `core`:
+            - impl<T, U> std::convert::TryFrom<U> for T
+              where U: std::convert::Into<T>;
+
+error: aborting due to previous error
+
+For more information about this error, try `rustc --explain E0119`.]]></screen>
+				<caption>多相版の実装……と言いたいが、<strong>残念ながらこれはコンパイルが通らない</strong></caption>
+			</figure>
+			<p>
+				多相の場合、残念ながら <code>TryFrom</code> は思ったほど一般的にできない。
+				これは、第三者ユーザがたとえば <code>Foo</code> という型を定義して <code><![CDATA[Into<AsciiString> for Foo]]></code>, <code><![CDATA[Into<Vec<u8>> for Foo]]></code>, <code><![CDATA[AsRef<[u8]> for Foo]]></code> の3つのトレイト実装を用意してしまったとき、第三者ユーザが実装した <code><![CDATA[Into<AsciiString> for Foo]]></code> とあなたが実装した <code><![CDATA[TryFrom<T> for AsciiString]]></code> が競合すると言っているのである (<code>TryFrom</code> は <code>Into</code> が実装されている型の組に対して自動的に実装される。ちょうど <code>Into</code> と <code>From</code> と同様の関係である)。
+			</p>
+			<p>
+				根本的には「知らないところで第三者が定義するかもしれない型に対して余計なことをしすぎるな」という話なので、諦めて既知のめぼしい型に対して手作業で実装していこう。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl TryFrom<String> for AsciiByteBuf {
+    type Error = CreationError<String>;
+
+    #[inline]
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}
+
+impl TryFrom<Vec<u8>> for AsciiByteBuf {
+    type Error = CreationError<Vec<u8>>;
+
+    #[inline]
+    fn try_from(s: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::new(s)
+    }
+}
+
+impl<'a> TryFrom<&'a str> for AsciiByteBuf {
+    type Error = CreationError<&'a str>;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        match AsciiBytes::new(s) {
+            Ok(v) => Ok(v.to_owned()),
+            Err(e) => Err(CreationError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for AsciiByteBuf {
+    type Error = CreationError<&'a [u8]>;
+
+    fn try_from(s: &'a [u8]) -> Result<Self, Self::Error> {
+        match AsciiBytes::new(s) {
+            Ok(v) => Ok(v.to_owned()),
+            Err(e) => Err(CreationError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}]]></programlisting>
+				<caption>ダルいが仕方ない</caption>
+			</figure>
+			<p>
+				ここで注意すべきなのは、<strong>検査の前にアロケーションを発生させるべきでない</strong>という点である。
+				<code>&amp;str</code> から <code>String</code> を作った後にエラーが発覚した場合、 <code>String</code> 作成のためのメモリアロケーションは全くの無駄となってしまう。
+				これを避けるべく、例では検査と同時に <code>&amp;AsciiBytes</code> を先に作り、そこから<link linkend="implementing-traits--borrow">後で実装する</link> <code>ToOwned</code> トレイトを利用して <code>AsciiByteBuf</code> を作成した。
+				もちろん <code>&amp;AsciiBytes</code> を経由しない方法もあり、たとえば以下のように実装することもできる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> TryFrom<&'a str> for AsciiByteBuf {
+    type Error = CreationError<&'a str>;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        match AsciiBytes::validate_bytes(s.as_bytes()) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: `s` is already validated.
+                Self::from_string_unchecked(s.to_owned())
+            }),
+            Err(e) => Err(CreationError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for AsciiByteBuf {
+    type Error = CreationError<&'a [u8]>;
+
+    fn try_from(s: &'a [u8]) -> Result<Self, Self::Error> {
+        match AsciiBytes::validate_bytes(s) {
+            Ok(_) => Ok(unsafe {
+                // SAFETY: `s` is already validated.
+                Self::from_bytes_unchecked(s.to_owned())
+            }),
+            Err(e) => Err(CreationError {
+                source: s,
+                error: e,
+            }),
+        }
+    }
+}]]></programlisting>
+				<caption>
+					検証と値の作成を別々に行う。
+					<code>&amp;AsciiBytes</code> を経由しないが unsafe なコードになる。
+				</caption>
+			</figure>
+			<p>
+				個人的には独自スライス型 (ここでは <code>AsciiBytes</code>) を経由する方がシンプルで良いと思うが、まあ好みの問題だろう。
+			</p>
+		</section>
+
+		<section xml:id="implementing-traits--from--into-inner">
+			<title>内側の型を取り出す</title>
+
+			<p>
+				ここまでで外側の (新しく用意した) 型の値を作成する実装ができたので、次は逆向き、内側の値を取り出す実装である。
+				これは失敗しないので簡単だ。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> From<&'a MyStr> for &'a str {
+    #[inline]
+    fn from(s: &'a MyStr) -> Self {
+        s.as_str()
+    }
+}
+
+impl<'a> From<&'a mut MyStr> for &'a mut str {
+    #[inline]
+    fn from(s: &'a mut MyStr) -> Self {
+        s.as_mut_str()
+    }
+}
+
+impl From<MyString> for String {
+    #[inline]
+    fn from(s: MyString) -> Self {
+        s.0
+    }
+}]]></programlisting>
+				<caption>追加の制約なしの型</caption>
+			</figure>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> From<&'a AsciiStr> for &'a str {
+    #[inline]
+    fn from(s: &'a AsciiStr) -> Self {
+        s.as_str()
+    }
+}
+
+impl From<AsciiString> for String {
+    #[inline]
+    fn from(s: AsciiString) -> Self {
+        s.0
+    }
+}]]></programlisting>
+				<caption>追加の制約付きの型</caption>
+			</figure>
+			<p>
+				コードを載せる価値があるか疑問さえ湧いてくるつまらなさである。
+				<code>AsciiBytes</code> と <code>AsciiByteBuf</code> 用の実装も <code>AsciiStr</code> / <code>AsciiString</code> と同様なので省略する。
+			</p>
+			<p>
+				追加の制約付きの型では、 <code><![CDATA[From<&'a mut AsciiStr> for &'a mut str]]></code> のような中身を露出する実装がないことに注意。
+				まあうっかり書きそうになっても <code>as_mut_str()</code> は unsafe な関数なので、書いている途中でおかしいと気付くはずである。
+			</p>
+		</section>
+
+		<section xml:id="implementing-traits--from--smartptr">
+			<title>スマートポインタとの変換</title>
+
+			<p>
+				これが絶妙に非自明なので詳しく解説する。
+			</p>
+
+			<section xml:id="implementing-traits--from--smartptr--slice-into-smartptr">
+				<title>スライスからスマートポインタへの変換</title>
+
+				<p>
+					先にスライスからスマートポインタへの変換を考える。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl From<&MyStr> for Box<MyStr> {
+    fn from(s: &MyStr) -> Self {
+        // Create the boxed inner slice.
+        let inner_box: Box<str> = Box::from(s.as_str());
+        // Take the allocated memory out of the box, without releasing.
+        let inner_boxed_ptr: *mut str = Box::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Box::<str>::from()`.
+            Box::from_raw(inner_boxed_ptr as *mut MyStr)
+        }
+    }
+}]]></programlisting>
+					<caption><code><![CDATA[Box<MyStr>]]></code> の作成</caption>
+				</figure>
+				<p>
+					<code><![CDATA[Box<MyStr>]]></code> を直接作るのでなく、 <code>&amp;MyStr</code> → <code>&amp;str</code> → <code><![CDATA[Box<str>]]></code> → <code>*mut str</code> → <code>*mut MyStr</code> → <code><![CDATA[Box<MyStr>]]></code> というように、作り方が std より提供されている <code><![CDATA[Box<str>]]></code> を起点として、 mut 生ポインタを経由して MyStr へ型変換することで値を作る。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[// Create the boxed inner slice.
+let inner_box: Box<str> = Box::from(s.as_str());]]></programlisting>
+					<caption>
+						<code>s.as_str()</code> で <code>&amp;MyStr</code> → <code>&amp;str</code>、 <code>Box::from()</code> で <code>&amp;str</code> → <code><![CDATA[Box<str>]]></code>。
+					</caption>
+				</figure>
+				<p>
+					まずは <code><![CDATA[Box<str>]]></code> を作ることを目標にする。そのため、 <code>&amp;MyStr</code> から中身の <code>&amp;str</code> を取り出し、ここから <code>Box::from()</code> で boxed string を作成する。
+					<code>Box::from()</code> 内でメモリアロケーションが発生し、 <code>&amp;str</code> が確保されたメモリ領域にコピーされる。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[// Take the allocated memory out of the box, without releasing.
+let inner_boxed_ptr: *mut str = Box::into_raw(inner_box);]]></programlisting>
+					<caption>
+						<code>Box::into_raw()</code> で <code><![CDATA[Box<str>]]></code> → <code>*mut str</code>
+					</caption>
+				</figure>
+				<p>
+					<code>Box::into_raw()</code> は、確保されたメモリ領域をそのままに <code>Box</code> 自体を解体する。
+					<code>Box</code> から別の型の <code>Box</code> へと安全に直接変換する方法がないため、一度生ポインタを経由してキャスト (型の読み替え) をしてやる必要があるのである。
+					もちろん生ポインタは所有権管理が自動ではないため、後で <code>Box::from_raw()</code> によって再び <code>Box</code> へと再構築してやらないとメモリリークとなる。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[unsafe {
+    // SAFETY: The string is valid as `MyStr`.
+    // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+    // and `inner_boxed_ptr` is allocated by `Box::<str>::from()`.
+    Box::from_raw(inner_boxed_ptr as *mut MyStr)
+}]]></programlisting>
+					<caption>
+						<code>inner_boxed_ptr as *mut MyStr</code> で <code>*mut str</code> → <code>*mut MyStr</code>、 <code>Box::from_raw()</code> で <code>*mut MyStr</code> → <code><![CDATA[Box<MyStr>]]></code>。
+					</caption>
+				</figure>
+				<p>
+					ここでは2つの不変条件 (invariant) が要求されていることに注意せよ。
+					ひとつは <code>inner_boxed_ptr: *mut str</code> を <code>*mut MyStr</code> にキャストするための、「ポインタで指されたデータが <code>MyStr</code> として妥当である」という条件。
+					<code>MyStr</code> の例では追加の制約はないが、もし <code>AsciiStr</code> のように追加の制約があっても問題ない。
+					そもそも元になったデータが、引数として渡された <code>s: &amp;MyStr</code> や <code>s: &amp;AsciiStr</code> などの自分自身そのものの型であり、受け取って以降に値の加工は行っていないから、この不変条件は自明に満たされる。
+				</p>
+				<p>
+					もうひとつの不変条件は <code>Box::from_raw()</code> で生ポインタから <code>Box</code> を安全に作るための条件である。
+				</p>
+				<blockquote cite="https://doc.rust-lang.org/1.48.0/std/boxed/index.html#memory-layout">
+					<p>
+						For non-zero-sized values, a <code>Box</code> will use the <code>Global</code> allocator for its allocation.
+						It is valid to convert both ways between a <code>Box</code> and a raw pointer allocated with the <code>Global</code> allocator,
+						given that the <code>Layout</code> used with the allocator is correct for the type.
+					</p>
+					<footer>
+						<link xl:href="https://doc.rust-lang.org/1.48.0/std/boxed/index.html#memory-layout">std::boxed のドキュメント</link>
+					</footer>
+				</blockquote>
+				<p>
+					端的に言えば、 <code><![CDATA[Box<T>]]></code> が内部的にメモリアロケーションに用いるのと同じメモリレイアウトで確保された領域であれば、 <code><![CDATA[Box::<T>::from_raw()]]></code> に渡しても安全であるということである。
+					<code>MyStr</code> の例については、 <code>#[repr(transparent)]</code> によってメモリレイアウトが <code>str</code> と互換になることが保証されているため、 <code><![CDATA[Box<str>]]></code> が確保する領域のメモリレイアウトと <code><![CDATA[Box<MyStr>]]></code> が確保する領域のそれも互換である。
+					すなわち、 <code><![CDATA[Box::<str>::from()]]></code> が確保するメモリ領域は <code><![CDATA[Box::<MyStr>::from()]]></code> が確保するであろうメモリ領域と互換なレイアウトを持つはずであるため、そのどちらも安全に <code><![CDATA[Box::<MyStr>::from_raw()]]></code> に渡すことができるというわけである。
+				</p>
+				<blockquote cite="https://github.com/rust-lang/rust/blob/7eac88abb2e57e752f3302f02be5f3ce3d7adfb4/library/std/src/ffi/c_str.rs#L191-L193">
+					<programlisting language="rust"><![CDATA[// `fn from` in `impl From<&CStr> for Box<CStr>` current implementation relies
+// on `CStr` being layout-compatible with `[u8]`.
+// When attribute privacy is implemented, `CStr` should be annotated as `#[repr(transparent)]`.]]></programlisting>
+					<footer>
+						<link xl:href="https://github.com/rust-lang/rust/blob/7eac88abb2e57e752f3302f02be5f3ce3d7adfb4/library/std/src/ffi/c_str.rs#L191-L193">Rust 1.48.0 の <code>std::ffi::CStr</code> の定義についてのコメント (抜粋)</link>。
+					</footer>
+				</blockquote>
+				<important>
+					<title>標準ライブラリの unsafe なコードの真似には注意</title>
+
+					<p>
+						注意しなければならないのが、標準ライブラリでは必ずしも <code>#[repr(transparent)]</code> を指定していないが、これをユーザが真似してはいけないということである。
+					</p>
+					<p>
+						たとえば Rust 1.48.0 時点での <link xl:href="https://github.com/rust-lang/rust/blob/1.48.0/library/std/src/ffi/c_str.rs#L191-L193"><code>std::ffi::CStr</code> の定義についてのコメント</link>では、 <code>#[repr(transparent)]</code> の指定がない理由が述べられている。
+						<code>#[repr(transparent)]</code> があれば <code>&amp;CStr</code> から <code><![CDATA[Box<CStr>]]></code> への変換が明らかに安全になるが、 <code>#[repr(transparent)]</code> であるという性質自体はライブラリとして保証したくないため、現時点ではコンパイラ実装の詳細に依存しておくとのことである。
+						これは標準ライブラリがコンパイラと共にメンテナンスされ頒布されているからこそできる荒技で、コンパイラの内部実装の変化が発生した際に標準ライブラリはそれを知って適切に実装を変えたり、あるいはコンパイラが std の型だけ特別扱いすることができるからこそ許されている。
+						すなわち <code>core</code> や <code>std</code> の内部においては、ユーザが通常手に入れられるよりも多くの保証が特別に与えられているのである。
+					</p>
+					<p>
+						もしユーザが std のコードをそのまま自分のクレートにコピペすると、最悪の場合安全性の保証が足りず未定義動作や脆弱性を引き起こすことになる。
+						unsafe なコードを書くときは <code>std</code> で使われていた方法だからといって信用するのではなく、安全である根拠をきちんと考える必要がある。
+					</p>
+				</important>
+				<p>
+					さて、 <code>Box</code> への変換はこれで実装できた。
+					同じようなスマートポインタであるところの <code>std::rc::Rc</code> と <code>std::sync::Arc</code> も、ほとんど同じようなものである。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[use std::rc::Rc;
+use std::sync::Arc;
+
+impl From<&MyStr> for Rc<MyStr> {
+    fn from(s: &MyStr) -> Self {
+        // Create the shared inner slice.
+        let inner_box: Rc<str> = Rc::from(s.as_str());
+        // Take the allocated memory out of the Rc, without releasing.
+        let inner_boxed_ptr: *const str = Rc::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Rc::<str>::from()`.
+            Rc::from_raw(inner_boxed_ptr as *const MyStr)
+        }
+    }
+}
+
+impl From<&MyStr> for Arc<MyStr> {
+    fn from(s: &MyStr) -> Self {
+        // Create the shared inner slice.
+        let inner_box: Arc<str> = Arc::from(s.as_str());
+        // Take the allocated memory out of the Arc, without releasing.
+        let inner_boxed_ptr: *const str = Arc::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Arc::<str>::from()`.
+            Arc::from_raw(inner_boxed_ptr as *const MyStr)
+        }
+    }
+}]]></programlisting>
+					<caption><code><![CDATA[Rc<MyStr>]]></code> と <code><![CDATA[Arc<MyStr>]]></code> の作成</caption>
+				</figure>
+				<p>
+					<code>Rc</code> と <code>Arc</code> は型名 (コメント内のものも含む) 以外全く同じコードである。
+					何度も書きそうであれば、マクロ化してしまうのも手だろう。
+				</p>
+				<p>
+					<code>Box</code> との違いは、 <code>into_raw()</code> が返す生ポインタの mutability である。
+					<code>Box</code> では確保されたメモリの唯一の所有者が box 自身なので、 mutable な生ポインタを返せる。
+					一方、 <code>Rc</code> や <code>Arc</code> では自分以外にも同じメモリ領域を参照しているものがあるかもしれないため所有権を奪うことはできず、参照者が唯一である保証ができないため const な生ポインタを返すしかない。
+				</p>
+				<p>
+					追加の制約付きの型 (例では <code>AsciiStr</code> と <code>AsciiBytes</code>) についても全く同様のコードになるので、実装例は省略する。
+				</p>
+			</section>
+
+			<section xml:id="implementing-traits--from--smartptr--owned-into-smartptr">
+				<title>所有権付きの型からスマートポインタへの変換</title>
+
+				<p>
+					所有権付きの型からの変換も、スライスからの変換と同様に既存の <code>String</code> や <code><![CDATA[Vec<T>]]></code> 等の実装を経由して実装する。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[impl From<MyString> for Box<MyStr> {
+    fn from(s: MyString) -> Self {
+        // Create the boxed inner slice.
+        let inner_box: Box<str> = Box::from(s.0);
+        // Take the allocated memory out of the box, without releasing.
+        let inner_boxed_ptr: *mut str = Box::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Box::<str>::from()`.
+            Box::from_raw(inner_boxed_ptr as *mut MyStr)
+        }
+    }
+}]]></programlisting>
+					<caption><code>MyString</code> からの <code><![CDATA[Box<MyStr>]]></code> の作成</caption>
+				</figure>
+				<p>
+					やっていることは本質的にはスライス型からの変化と同じで、 <code language="rust">Box::from(s.as_str())</code> で <code>&amp;str</code> から <code>Box</code> を作っていたところを、 <code language="rust">Box::from(s.0)</code> で <code>String</code> から <code>Box</code> を作るよう変更しただけである。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[use std::rc::Rc;
+use std::sync::Arc;
+
+impl From<MyString> for Box<MyStr> {
+    fn from(s: MyString) -> Self {
+        // Create the shared inner slice.
+        let inner_box: Rc<str> = Rc::from(s.0);
+        // Take the allocated memory out of the Rc, without releasing.
+        let inner_boxed_ptr: *const str = Rc::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Rc::<str>::from()`.
+            Rc::from_raw(inner_boxed_ptr as *const MyStr)
+        }
+    }
+}
+
+impl From<MyString> for Arc<MyStr> {
+    fn from(s: MyString) -> Self {
+        // Create the shared inner slice.
+        let inner_box: Arc<str> = Arc::from(s.0);
+        // Take the allocated memory out of the Arc, without releasing.
+        let inner_boxed_ptr: *const str = Arc::into_raw(inner_box);
+
+        unsafe {
+            // SAFETY: The string is valid as `MyStr`.
+            // SAFETY: Memory layouts for `str` and `MyStr` are compatible,
+            // and `inner_boxed_ptr` is allocated by `Arc::<str>::from()`.
+            Arc::from_raw(inner_boxed_ptr as *const MyStr)
+        }
+    }
+}]]></programlisting>
+					<caption><code>MyString</code> からの <code><![CDATA[Box<MyStr>]]></code> の作成</caption>
+				</figure>
+				<p>
+					<code>Rc</code> と <code>Arc</code> についても同様で、特に語るべきことはない。
+					また <code>AsciiString</code> や <code>AsciiByteBuf</code> のような追加の制限付きの型でも同様の実装になるため、これも例は省略する。
+				</p>
+			</section>
+		</section>
+
+		<section xml:id="implementing-traits--from--cow">
+			<title><code>Cow</code>との変換</title>
+
+			<note>
+				<title>先に <code>Borrow</code> と <code>ToOwned</code> trait の実装が必要</title>
+
+				<p>
+					<code><![CDATA[Cow<'_, T>]]></code> は <code>T</code> が <code>Sized</code> な (つまりサイズがコンパイル時に確定している) 型である場合には何もせずうまく使えるが、 <code>T</code> が unsized である場合 (DST である場合を含む) はセットアップが必要である。
+					より具体的には、 <code>Cow</code> は「借用された型」と「所有権付きの型」を通常 <code>&amp;'_ T</code> と <code>T</code> として扱うが、 <code>T</code> が unsized である場合これらの型は全く別々の型になるため、それらの型を相互に紐付けする必要がある。
+					たとえば <code>str</code> と <code>String</code> 、あるいは <code>[u8]</code> と <code><![CDATA[Vec<u8>]]></code> などの型の組は、いずれも <code>std::borrow::Borrow</code> トレイトと <code>std::borrowed::ToOwned</code> トレイトで紐付いている。
+				</p>
+				<p>
+					<code>Borrow</code> と <code>ToOwned</code> の実装については<link linkend="implementing-traits--borrow">後の節</link>で説明する。
+				</p>
+			</note>
+
+			<figure>
+				<programlisting language="rust"><![CDATA[impl<'a> From<&'a MyStr> for Cow<'a, MyStr> {
+    #[inline]
+    fn from(s: &'a MyStr) -> Self {
+        Cow::Borrowed(s)
+    }
+
+impl From<MyString> for Cow<'_, MyString> {
+    #[inline]
+    fn from(s: MyString) -> Self {
+        Cow::Owned(s)
+    }
+}]]></programlisting>
+				<caption>
+					やるだけ。
+				</caption>
+			</figure>
+			<p>
+				やるだけ。
+			</p>
+			<p>
+				追加の制約があってもなくても同様の実装になるので <code>AsciiStr</code> と <code>AsciiBytes</code> の例は省略。
+			</p>
+		</section>
+	</section>
+
+	<section xml:id="implementing-traits--from-str">
+		<title><code>FromStr</code></title>
+
+		<p>
+			<code>FromStr</code> トレイトが実装されていると、 <code>.parse()</code> が利用可能になる。
+			変換するだけなら <code><![CDATA[TryFrom<&str>]]></code> か <code><![CDATA[From<&str>]]></code> があれば十分なのだが、一応有用そうであれば実装しておくと良い。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::str::FromStr for MyString {
+    type Err = core::convert::Infallible;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(s.into())
+    }
+}]]></programlisting>
+			<caption>
+				追加の制約のない型の場合
+			</caption>
+		</figure>
+		<p>
+			失敗しない変換であれば <code>From</code> で既に実装済のはずなので、そちらに丸投げする。
+		</p>
+		<p>
+			エラー型としては <link xl:href="https://doc.rust-lang.org/1.48.0/core/convert/enum.Infallible.html"><code>core::convert::Infallible</code></link> を使う。
+			これは実行時に値を持てない型で、最適化に強力に貢献するはずである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::str::FromStr for AsciiString {
+    type Err = AsciiError;
+
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        TryFrom::try_from(s)
+    }
+}]]></programlisting>
+			<caption>
+				追加の制約付きの型の場合
+			</caption>
+		</figure>
+		<p>
+			失敗しうる変換であれば <code>TryFrom</code> で既に実装済のはずなので、そちらに丸投げする。
+		</p>
+	</section>
+
+	<section xml:id="implementing-traits--as-ref">
+		<title><code>AsRef</code>, <code>AsMut</code></title>
+
+		<p>
+			これらのトレイトの必要性は用途にもよるため、場合によっては <code>AsRef</code> や <code>AsMut</code> の実装は不要かもしれないが、とりあえず実装例を提示する。
+		</p>
+
+		<section xml:id="implementing-traits--as-ref--self">
+			<title>独自スライス型自体への変換</title>
+
+			<p>
+				これは自分で実装していると意外に忘れがちだが、 <code><![CDATA[AsRef<T> for T]]></code> のような汎用的な実装は存在しない。
+				つまり、 <code><![CDATA[T: AsRef<MySlice>]]></code> のような trait bound を利用する可能性のある型には、自分で <code language="rust"><![CDATA[impl AsRef<MySlice> for MySlice]]></code> のような実装を用意してやる必要がある。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsRef<MyStr> for MyStr {
+    #[inline]
+    fn as_ref(&self) -> &MyStr {
+        self
+    }
+}
+
+impl AsMut<MyStr> for MyStr {
+    #[inline]
+    fn as_mut(&mut self) -> &mut MyStr {
+        self
+    }
+}
+
+impl AsRef<MyStr> for MyString {
+    #[inline]
+    fn as_ref(&self) -> &MyStr {
+        self.as_my_str()
+    }
+}
+
+impl AsMut<MyStr> for MyString {
+    #[inline]
+    fn as_mut(&mut self) -> &mut MyStr {
+        self.as_my_str_mut()
+    }
+}]]></programlisting>
+				<caption>自分自身への変換</caption>
+			</figure>
+
+			<p>
+					追加の制約の有無に関係なく実装は同様になるため、 <code>AsciiStr</code> と <code>AsciiBytes</code> の例は省略する。
+			</p>
+		</section>
+
+		<section xml:id="implementing-traits--as-ref--inner">
+			<title>元のスライス型への変換</title>
+
+			<p>
+				追加の制約なしの型については何も考えず実装できる。
+				が、 <strong><code>Box</code> に対する <code>AsRef</code> の実装をしておくと便利かもしれない</strong>。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsRef<str> for MyStr {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsMut<str> for MyStr {
+    #[inline]
+    fn as_mut(&mut self) -> &mut str {
+        self.as_mut_str()
+    }
+}
+
+impl AsRef<str> for Box<MyStr> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<str> for MyString {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsMut<str> for MyString {
+    #[inline]
+    fn as_mut(&mut self) -> &mut str {
+        self.as_mut_str()
+    }
+}
+
+impl AsMut<str> for Box<MyStr> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut str {
+        self.as_mut_str()
+    }
+}]]></programlisting>
+				<caption>追加の制約のない型では、 <code>AsMut</code> を実装してもよい。しなくともよい。</caption>
+			</figure>
+			<p>
+				<link linkend="defining-slice-methods--as-inner">メソッド実装の節</link>でも指摘したように、 <strong>追加の制約のある型では元の型への mutable な参照を safe に返してはいけない</strong>。
+				つまり、<strong>そのような場合には <code>AsMut</code> を実装してはいけない</strong>。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsRef<str> for AsciiStr {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<str> for AsciiString {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}]]></programlisting>
+				<caption>追加の制約付きの型では、 <code>AsMut</code> で内部の型を返してはいけない</caption>
+			</figure>
+			<p>
+				<code><![CDATA[AsRef<str> for Box<MyStr>]]></code> は稀に欲しいことがある。
+				この実装がなくとも <code><![CDATA[v: Box<MyStr>]]></code> から <code>v.as_str()</code> によって <code>&amp;str</code>を得ることはできるが、 <code language="rust"><![CDATA[fn foo<T: AsRef<str>>(v: &T)]]></code> のような関数に <code>f(&amp;v)</code> と渡すことができない。
+			</p>
+			<p>
+				<code>AsciiBytes</code> については <code>AsciiStr</code> の場合と同様なので省略する。
+			</p>
+		</section>
+
+		<section xml:id="implementing-traits--as-ref--other">
+			<title>その他の型への変換</title>
+
+			<p>
+				元の型と自分自身への変換以外のスライス型への変換を実装しても良い (もちろん安全であればの話だが)。
+				たとえば <code>str</code> は <code><![CDATA[AsRef<[u8]>]]></code>, <code><![CDATA[AsRef<std::ffi::OsStr>]]></code>, <code><![CDATA[AsRef<std::path::Path>]]></code> 等のトレイト実装を持っている。
+			</p>
+
+			<figure>
+				<programlisting language="rust"><![CDATA[impl AsRef<[u8]> for MyStr {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_str().as_bytes()
+    }
+}
+
+impl AsRef<[u8]> for MyString {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_str().as_bytes()
+    }
+}]]></programlisting>
+				<caption>
+					所有権のある型とない型それぞれに <code><![CDATA[AsRef<[u8]>]]></code> を実装した例
+				</caption>
+			</figure>
+			<p>
+				どのような変換を実装するかは用途次第であり、 <code><![CDATA[AsRef<[u8]>]]></code> の実装例は <code>MyStr</code> と同様になるため、 <code>AsciiStr</code> と <code>AsciiBytes</code> でのコード例は省略する。
+			</p>
+			<p>
+				くれぐれも<strong>制約が緩くなるような変換で mutable な参照を返さないこと</strong>。
+			</p>
+		</section>
+	</section>
+
+	<section xml:id="implementing-traits--deref">
+		<title><code>Deref</code>, <code>DerefMut</code></title>
+
+		<p>
+				<code>Deref</code> と <code>DerefMut</code> はある型を透過的に別の型への参照として振る舞わせるもので、非常に便利である一方、 strong typedef の「内部的には同じ型を別個のものとして区別させる」という目的と反するものでもある。
+				標準ライブラリのドキュメントでは、これらのトレイトは<strong>スマートポインタのみに実装すべきである</strong>と強調されている。
+		</p>
+		<blockquote cite="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">
+			<p>
+				Implementing <code>Deref</code> for smart pointers makes accessing the data behind them convenient, which is why they implement <code>Deref</code>.
+				On the other hand, the rules regarding <code>Deref</code> and <code>DerefMut</code> were designed specifically to accommodate smart pointers.
+				Because of this, <strong><code>Deref</code> should only be implemented for smart pointers</strong> to avoid confusion.
+			</p>
+			<footer>
+				Rust 1.48.0 の <link xl:href="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">core::ops::Deref</link> のドキュメント。
+				強調は原文ママ
+			</footer>
+		</blockquote>
+		<p>
+			たとえば <code>str</code> は内部的には <code>[u8]</code> であるが、 <code><![CDATA[Deref<Target=[u8]> for str]]></code> は実装されていない。
+			このような「透過的に同一視されてほしいわけではない型」は <code><![CDATA[AsRef<[u8]>]]></code> だったり <code>.as_bytes()</code> で明示的な変換を行うべしということである。
+		</p>
+		<p>
+			一方で、 <code>&amp;String</code> が透過的に <code>&amp;str</code> として扱えてほしいとか <code><![CDATA[Vec<u8>]]></code> を透過的に <code>&amp;[u8]</code> として扱いたいとかは全くもって正当な要求である。
+			実際、標準ライブラリでも <code><![CDATA[Deref<Target=str> for String]]></code> とか <code><![CDATA[Deref<Target=[u8]> for Vec<u8>]]></code> などの実装がされている。
+			よって、所有権付きの独自型から所有権なしのスライス型への <code>Deref</code> による変換は一般的に実装すべきである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::ops::Deref for MyString {
+    type Target = MyStr;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_my_str()
+    }
+}
+
+impl core::ops::DerefMut for MyString {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_my_str_mut()
+    }
+}]]></programlisting>
+			<caption>
+				独自スライス型への暗黙の変換を許容する
+			</caption>
+		</figure>
+		<p>
+			追加の制約の有無に関係なく同じような実装になるため、 <code>AsciiString</code> と <code>AsciiByteBuf</code> への実装例は省略する。
+		</p>
+		<p>
+			一応例としてコードは載せるが、特に所有権のないスライス型に本当に <code>Deref</code> を実装すべきかは熟慮すべきである。
+			困ったら実装せずにおくのがよい。
+			後から std や core のトレイトを実装しても breaking change にはならないはずである。
+			<!-- TODO:
+				根拠として https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bounds の
+				"Deriving more traits from the standard library using the `derive` attribute is not a breaking change." を持ってこようかと思ったが、
+				core::ops::Deref は std のトレイトだが derive ではない……
+			-->
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[// Do you really want this?
+impl core::ops::Deref for MyStr {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+// Do you really REALLY want this?
+impl core::ops::DerefMut for MyStr {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}]]></programlisting>
+			<caption>
+				独自スライス型への <code>Deref</code> と <code>DerefMut</code> の実装
+			</caption>
+		</figure>
+		<p>
+			再三繰り返すが、追加の制約がある型の場合、くれぐれも内側の型 (<code>MyStr</code> の例であれば <code>str</code>) への mutable 参照を safe に露出させてはいけない。
+			たとえば <code>AsciiStr</code> から <code>DerefMut</code> 経由で <code>&amp;mut str</code> を露出させるのは厳禁である。
+		</p>
+		<p>
+			例のごとく、 <code>AsciiStr</code> と <code>AsciiBytes</code> への実装例は省略する。
+		</p>
+	</section>
+
+	<section xml:id="implementing-traits--fmt">
+		<title><code>Debug</code>, <code>Display</code></title>
+
+		<p>
+			一番ありがちなのは、 strong typedef によって表示が変化しないでほしいという場合であろう。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[use core::fmt;
+
+impl fmt::Debug for MyStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl fmt::Display for MyStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl fmt::Debug for MyString {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl fmt::Display for MyString {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}]]></programlisting>
+			<caption>
+				単純に内部の型 (<code>str</code> と <code>String</code>) に処理を移譲した
+			</caption>
+		</figure>
+		<p>
+			この例では、内側の型 (<code>MyStr</code> の場合は <code>str</code>) の <code>Debug</code> と <code>Display</code> 実装をそのまま流用している。
+			何かしらの整形をして表示したくば、そのように実装すべきである。
+		</p>
+		<note>
+			<title><code>.fmt()</code> の解決</title>
+
+			<p>
+				実はトレイト実装をしている間、トレイトメソッド内ではそのトレイトが use されたような状態になっている。
+				よって、 <code>self.0.fmt(f)</code> は <code>Debug</code> の実装中には <code>Debug::fmt()</code> へと、また <code>Display</code> の実装中には <code>Display::fmt()</code> へと解決される。
+			</p>
+			<programlisting language="rust"><![CDATA[use core::fmt;
+
+impl fmt::Debug for MyStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // self.0.fmt(f) is same as:
+        <str as fmt::Debug>::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for MyStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // self.0.fmt(f) is same as:
+        <str as fmt::Display>::fmt(&self.0, f)
+    }
+}]]></programlisting>
+		</note>
+		<p>
+			上の例では両方で内側の型のトレイト実装へと丸投げしたが、もし独自スライス型で独自に整形を行うなら、所有権付きの型の実装は内部の型でなくスライス型の方へ丸投げした方が良い。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[use core::fmt;
+
+impl fmt::Debug for MyString {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_my_str().fmt(f)
+    }
+}
+
+impl fmt::Display for MyString {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_my_str().fmt(f)
+    }
+}]]></programlisting>
+			<caption>
+				<code>self.0</code> ではなく <code>self.as_my_str()</code> で取得した独自スライス型の値へ整形を丸投げする手もある
+			</caption>
+		</figure>
+		<p>
+			追加の制約の有無は関係ないので、 <code>AsciiStr</code> や <code>AsciiBytes</code> などの実装例は省略。
+		</p>
+		<p>
+			ここでは一般的な <code>Debug</code> と <code>Display</code> だけを挙げたが、他の <code>core::fmt</code> の整形用トレイトで実装したいものがあれば好きに実装することができる。
+		</p>
+	</section>
+
+	<section xml:id="implementing-traits--borrow">
+		<title><code>Borrow</code>, <code>BorrowMut</code>, <code>ToOwned</code></title>
+
+		<p>
+			これらはスライス型を独自に定義するうえで特に使い勝手に影響するトレイトである。
+			具体的には、 <code>.to_owned()</code> が使えるようになる<footnote xml:id="footnote-toowned-in-prelude" refmark-id="footnote-ref-toowned-in-prelude">
+				実は <code>"hello".to_owned()</code> などとした場合、 <code><![CDATA[<str as ToOwned>::to_owned("hello")]]></code> が呼ばれている。
+				存在感の薄いトレイトだが、 <code>ToOwned</code> は <link xl:href="https://doc.rust-lang.org/1.48.0/std/prelude/v1/index.html">prelude</link> に入っているのである。
+			</footnote>のと、 <code>std::borrow::Cow</code> が使えるようになる。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::borrow::Borrow<MyStr> for MyString {
+    #[inline]
+    fn borrow(&self) -> &MyStr {
+        self.as_my_str()
+    }
+}
+
+impl core::borrow::BorrowMut<MyStr> for MyString {
+    #[inline]
+    fn borrow_mut(&mut self) -> &mut MyStr {
+        self.as_my_str_mut()
+    }
+}
+
+impl std::borrow::ToOwned for MyStr {
+    type Owned = MyString;
+
+    fn to_owned(&self) -> Self::Owned {
+        let s = self.as_str();
+        MyString::new(s.to_owned())
+    }
+}]]></programlisting>
+		</figure>
+		<p>
+			<code><![CDATA[Borrow<T>]]></code> は <code>T</code> 型の参照を取り出すためのトレイトである。
+			<code><![CDATA[BorrowMut<T>]]></code> は mutable 参照を取り出す版。
+		</p>
+		<p>
+			<code>ToOwned</code> は、参照型から所有権付きの型 (と値) を得るためのトレイトである。
+			<code>Clone</code> トレイトが実装されてさえいれば、 <code>&amp;T</code> の所有権付きの型 <code>T</code> の値を <code>.clone()</code> によって得られる。
+			しかし <code>[T]</code>、 <code>str</code> や <code>MyStr</code> などのスライス型は DST であり <code>Clone</code> トレイトを実装できず、参照を外した型の値をそのまま保持できないから、代わりに何かしらのバッファ的な型が必要になる。
+				これは <code>[T]</code> の場合は <code><![CDATA[Vec<T>]]></code> であり、 <code>str</code> の場合は <code>String</code> であり、同様に <code>MyStr</code> に対しては <code>MyString</code> を用意してやろうということである。
+		</p>
+		<p>
+			同じようなコードになるが、一応 unsafe を使うことになるので <code>AsciiStr</code> のコード例も確認しておこう。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::borrow::Borrow<AsciiStr> for AsciiString {
+    #[inline]
+    fn borrow(&self) -> &AsciiStr {
+        self.as_ascii_str()
+    }
+}
+
+impl core::borrow::BorrowMut<AsciiStr> for AsciiString {
+    #[inline]
+    fn borrow_mut(&mut self) -> &mut AsciiStr {
+        self.as_ascii_str_mut()
+    }
+}
+
+impl std::borrow::ToOwned for AsciiStr {
+    type Owned = AsciiString;
+
+    fn to_owned(&self) -> Self::Owned {
+        let s = self.as_str();
+        unsafe {
+            // SAFETY: Valid `AsciiStr` string is also valid as `AsciiString`.
+            AsciiString::new_unchecked(s.to_owned())
+        }
+    }
+}]]></programlisting>
+			<caption>
+				ほとんど同じだが unsafe を使っている部分がある
+			</caption>
+		</figure>
+		<p>
+			<code>&amp;AsciiStr</code> から直接 <code>AsciiString</code> を作れないため <code>&amp;str</code> と <code>String</code> を経由する。
+			これ自体は <code>MyStr</code> の例と同じだが、今回の例では <code>String</code> から <code>AsciiString</code> を作るのが unsafe な操作である。
+			不変条件を満たしていること自体は明らかなので、コメントで明示したうえで素直に書けばよい。
+		</p>
+		<tip>
+			<title>unsafe の利用を排するべきか</title>
+
+			<p>
+				<code>unsafe</code> の個数や頻度をコードの危険性や品質の判定に使おうというムーヴメントがあり、これ自体はまあ真っ当なものである。
+				しかし、この判定基準に過剰に迎合するために本来は unsafe であるものをあたかも unsafe でないかのように見せるというのはよろしくない。
+			</p>
+			<p>
+				たとえば <code>AsciiStr</code> の例と同等のコードは次のようにも書ける。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl std::borrow::ToOwned for AsciiStr {
+    type Owned = AsciiString;
+
+    fn to_owned(&self) -> Self::Owned {
+        let s = self.as_str();
+        AsciiString(s.to_owned())
+    }
+}]]></programlisting>
+				<caption>
+					unsafe を追放できた、バンザイ！ ……本当に？
+				</caption>
+			</figure>
+			<p>
+				これでプログラムがより安全になっただろうか？
+				もちろんそんなことはない。
+				むしろ「<code>AsciiString</code> の内容は ASCII 文字列でなければならない」という不変条件の明示がなくなり、さらには unsafe のマークも消されてしまったことで、本当に安全か確認することさえ大変になってしまった。
+				事前知識一切なしにプログラムを読んで、いきなり「この <code>AsciiString(s.to_owned())</code> では暗黙に不変条件が設定されていて、それは確かに守られているな」と思える人はいないだろう。
+			</p>
+			<p>
+				独自スライスまわりの操作は本質的に unsafe が不可避だったり、あるいは safe に書けはするが検査するまでもなく安全とわかる箇所がそれなりに多い。
+				安易に unsafe の数を減らすのではなく、人間による安全性の確認がしやすいような実装を心掛けるべきである。
+			</p>
+			<p>
+				もしどうしても unsafe を排したいのであれば、無駄な検査が行われるコストと引き換えに以下のように書くことはできる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl std::borrow::ToOwned for AsciiStr {
+    type Owned = AsciiString;
+
+    fn to_owned(&self) -> Self::Owned {
+        let s = self.as_str();
+        AsciiString::new(s.to_owned())
+            .expect("Should never fail: `AsciiStr` must have ASCII string")
+    }
+}]]></programlisting>
+				<caption>
+					本当に safe なコード。
+					本来不要な検査が行われる。
+					万が一実装バグなどで不変条件が破れていても、未定義動作にならずクラッシュする。
+				</caption>
+			</figure>
+		</tip>
+	</section>
+
+	<section xml:id="implementing-traits--default">
+		<title><code>Default</code></title>
+
+		<p>
+			所有権付きの独自型であれば <code>Default</code> トレイトは derive するなり自前実装するなりが簡単であるから、好きに実装すれば良い。
+		</p>
+		<p>
+			しかし実はそれ以外にも <code>Default</code> を実装できる対象がある。
+			独自スライス型の参照と可変参照、そして <code>Box</code> である。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl Default for &MyStr {
+    fn default() -> Self {
+        MyStr::new(<&str>::default())
+    }
+}
+
+impl Default for &mut MyStr {
+    fn default() -> Self {
+        MyStr::new_mut(<&mut str>::default())
+    }
+}
+
+impl Default for Box<MyStr> {
+    #[inline]
+    fn default() -> Self {
+        <&MyStr>::default().into()
+    }
+}]]></programlisting>
+			<caption>追加の制約のない型の場合</caption>
+		</figure>
+		<p>
+			地味に便利なことに、 <link xl:href="https://doc.rust-lang.org/1.48.0/core/default/trait.Default.html#impl-Default-85"><code>&amp;'_ [T]</code></link> や <link xl:href="https://doc.rust-lang.org/1.48.0/core/default/trait.Default.html#impl-Default-86"><code>&amp;'_ mut [T]</code></link>、<link xl:href="https://doc.rust-lang.org/1.48.0/core/default/trait.Default.html#impl-Default-33"><code>&amp;'_ str</code></link>、<link xl:href="https://doc.rust-lang.org/1.48.0/core/default/trait.Default.html#impl-Default-32"><code>&amp;'_ mut str</code></link> 等の参照型には実は <code>Default</code> トレイトが実装されている。
+			もちろんこれらは長さ0の配列や文字列であるから、参照が指す値は特に有意義ということもない。
+			しかし <code>str</code> や <code>[T]</code> の strong typedef を定義しようというときにはこのトレイト実装自体が強力な道具となる。
+			なぜなら、 <code>Default</code> で作成できるこれらの参照は任意の lifetime で作ることができるため、どのような lifetime が要求されていても問題なく使える万能の参照だからである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[let a: &'static str = Default::default(); // OK!
+let b: &'static mut MyStr = Default::default(); // OK!]]></programlisting>
+			<caption>
+				どんな lifetime でも使えるので <code>'static</code> さえ可能だし、 mutable な参照も作れる
+			</caption>
+		</figure>
+		<p>
+			<code>Default</code> トレイトはどんな場合にでも実装できるわけではないから、本当に妥当なデフォルト値があってそれが正しく用いられているかは確認すべきである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl Default for &AsciiStr {
+    fn default() -> Self {
+        unsafe {
+            // SAFETY: An empty string is valid ASCII string.
+            AsciiStr::new_unchecked(<&str>::default())
+        }
+    }
+}
+
+impl Default for &mut AsciiStr {
+    fn default() -> Self {
+        unsafe {
+            // SAFETY: An empty string is valid ASCII string.
+            AsciiStr::new_unchecked_mut(<&mut str>::default())
+        }
+    }
+}
+
+impl Default for Box<AsciiStr> {
+    #[inline]
+    fn default() -> Self {
+        <&AsciiStr>::default().into()
+    }
+}]]></programlisting>
+			<caption>追加の制約付きだが、デフォルト値として空文字列が使える場合</caption>
+		</figure>
+		<p>
+			<code>AsciiBytes</code> の例は <code>AsciiStr</code> と同様になるので省略する。
+		</p>
+	</section>
+
+	<section xml:id="implementing-traits--cmp">
+		<title><code>PartialEq</code>, <code>PartialOrd</code></title>
+
+		<p>
+			経験的に、これが一番面倒である。
+			面倒なので最後の方のセクションに持ってきた (最後に書くと楽とは言ってない)。
+			というか正直勘弁してほしいので、完全なコード例は諦めて概要とコード片だけで説明する。
+		</p>
+		<p>
+			まず、比較を独自に実装するとしても複数の方法がある。
+		</p>
+		<ul>
+			<li>
+				<phrase>
+					内部の型と全く同じ比較を用いる
+				</phrase>
+				<ul>
+					<li>
+						<code>MyStr</code>, <code>AsciiStr</code>, <code>AsciiBytes</code> は自然に作ればいずれもこの種類である。
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					独自スライス型同士では独自の比較を使い、独自スライスと内部の型では内部の型の比較を流用する
+				</phrase>
+				<ul>
+					<li>
+						<phrase>
+							たとえば「URI 文字列型同士では正規化を行った結果で比較するが、 URI 文字列型と通常の文字列型では単純な文字列比較が行われる」など
+						</phrase>
+						<ul>
+							<li>
+								<code>Uri::new("http://example.com") == Uri::new("http://example.com:80/")</code> かつ <code>Uri::new("http://example.com") != "http://example.com:80/"</code> ということ
+							</li>
+						</ul>
+					</li>
+					<li>
+						たとえば「独自スライス型の文字列は特定の文法に従っているので、一部分のみの比較で済む」などの場合
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					すべての型に対して独自の比較を使う
+				</phrase>
+				<ul>
+					<li>
+						<phrase>
+							たとえば rocket v0.4.6 クレートの <link xl:href="https://docs.rs/rocket/0.4.6/rocket/http/uncased/struct.UncasedStr.html"><code>UncasedStr</code></link> など
+						</phrase>
+						<ul>
+							<li>
+								これは比較の際に大文字・小文字の違いを無視する文字列型である。
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</li>
+			<li>
+				<phrase>
+					その他
+				</phrase>
+				<ul>
+					<li>
+						たとえば「同じ独自スライス型同士では通常と逆順 (つまり辞書式順序での降順) で比較され、その他の型との比較は許さない」など
+					</li>
+				</ul>
+			</li>
+		</ul>
+		<p>
+			どのような比較を定義するかは本当に用途と設計次第なので、私からアドバイスできることは何もない。
+			強いて言うなら、<strong>意味的にマトモな比較を実装しましょう</strong>とか、<strong>対称性・反対称性・推移性などの要求されている性質を満たすような実装にしましょう</strong><footnote xml:id="footnote-partialeq-transitivity-failure-example" refmark-id="footnote-ref-partialeq-transitivity-failure-example">
+				利便性を追求したつもりで <code>PartialEq</code> が満たすべき性質を破ってしまう実装の例などが <link xl:href="https://doc.rust-lang.org/1.48.0/core/cmp/trait.PartialEq.html#how-can-i-compare-two-different-types"><code>PartialEq</code> のドキュメントで紹介されており</link>、参考になる。
+				是非一読されることをおすすめする。
+			</footnote>とか、そんなところか。
+		</p>
+
+		<section xml:id="implementing-traits--cmp--symmetrical-operands">
+			<title><code>PartialEq</code> と <code>PartialOrd</code> の同時実装</title>
+
+			<p>
+				特に独自スライス型においては、配列や文字列に似た性質を持っている場合が多く、 <code>PartialEq</code> と <code>PartialOrd</code> の両方を実装したくなる場合が多い。
+				このような実装はマクロである程度自動化できる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// Implement `PartialEq` and `Eq` for the given types.
+macro_rules! impl_cmp {
+    ($ty_lhs:ty, $ty_rhs:ty) => {
+        impl PartialEq<$ty_rhs> for $ty_lhs {
+            #[inline]
+            fn eq(&self, o: &$ty_rhs) -> bool {
+                <str as PartialEq<str>>::eq(AsRef::as_ref(self), AsRef::as_ref(o))
+            }
+        }
+        impl PartialOrd<$ty_rhs> for $ty_lhs {
+            #[inline]
+            fn partial_cmp(&self, o: &$ty_rhs) -> Option<core::cmp::Ordering> {
+                <str as PartialOrd<str>>::partial_cmp(AsRef::as_ref(self), AsRef::as_ref(o))
+            }
+        }
+    };
+}]]></programlisting>
+				<caption>
+					<code>PartialEq</code> と <code>PartialOrd</code> を同時に実装する例。
+					なお、比較アルゴリズムは <code>str</code> の比較に丸投げしている。
+				</caption>
+			</figure>
+		</section>
+
+		<section xml:id="implementing-traits--cmp--symmetrical-operands">
+			<title>左右オペランドの交換</title>
+
+			<p>
+				多くの場合、比較の左右オペランドを入れ替えても比較可能にしたいと思うことだろう。
+				たとえば <code>MyStr == str</code> が可能で <code>str == MyStr</code> が不可能というのはあまり素敵ではないし、実際遭遇すると割とフラストレーションが溜まる<footnote xml:id="footnote-non-symmetrical-comparation-example" refmark-id="footnote-ref-non-symmetrical-comparation-example">
+					具体例としては proc-macro2 v1.0.24 クレートの <link xl:href="https://docs.rs/proc-macro2/1.0.24/proc_macro2/struct.Ident.html"><code>Ident</code></link> 型などがある。
+					これは <code>Ident == str</code> の比較ができるのに <code>str == Ident</code> の比較ができないという代物で、私も何度か悲しいコンパイルエラーを出したことがある。
+				</footnote>。
+			</p>
+			<p>
+				こういう実装はさっさとマクロにするに限る。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[/// Implement `PartialEq` and `Eq` symmetrically for the given types.
+macro_rules! impl_cmp_symmetric {
+    ($ty_lhs:ty, $ty_rhs:ty) => {
+        impl_cmp!($ty_lhs, $ty_rhs);
+        impl_cmp!($ty_rhs, $ty_lhs);
+    };
+}]]></programlisting>
+				<caption>
+					オペランド入れ替えの実装を楽にする例。
+					先述の <code>impl_cmp!</code> マクロを用いた。
+				</caption>
+			</figure>
+		</section>
+
+		<section xml:id="implementing-traits--cmp--never-ending-impl-cmp">
+			<title>いくら書いても満たされることのない比較実装欲 (?)</title>
+
+			<p>
+				たとえばこれらのマクロを使って <code>MyStr</code> に比較を実装しようとすると、こうなる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[impl_cmp_symmetric!(MyStr, str);
+impl_cmp_symmetric!(MyStr, &str);
+impl_cmp_symmetric!(&MyStr, str);
+
+impl_cmp_symmetric!(MyStr, String);
+impl_cmp_symmetric!(MyStr, &String);
+impl_cmp_symmetric!(MyStr, Box<str>);
+impl_cmp_symmetric!(Box<MyStr>, str);
+impl_cmp_symmetric!(MyStr, Cow<'_, str>);
+
+impl_cmp_symmetric!(MyString, &MyString);
+impl_cmp_symmetric!(MyString, MyStr);
+impl_cmp_symmetric!(MyString, &MyStr);
+impl_cmp_symmetric!(MyString, str);
+impl_cmp_symmetric!(MyString, &str);
+impl_cmp_symmetric!(&MyString, str);]]></programlisting>
+				<caption>
+					オペランド入れ替えの実装を楽にする例。
+					先述の <code>impl_cmp_symmetric!</code> マクロを用いた。
+					残念ながら完全ではない。
+				</caption>
+			</figure>
+			<p>
+				不思議なことに、この比較というのがいくら実装しても後から足りないものが出てくるのである<footnote xml:id="footnote-comparations-added-later" refmark-id="footnote-ref-comparations-added-later">
+					Rust の標準ライブラリでも実際そんな感じで、 <code>str</code> 系とか <code>Path</code> 系とかでたまに比較が追加されたりなどしているっぽい
+				</footnote>。
+				特にありがちなのは、内側の型関係、所有権の有無関係、互換性のある別の型、 <code>Box</code>、 <code>Rc</code>、 <code>Arc</code>、 <code>Cow</code>、参照の有無、参照の mutability などなど。
+				本当にやっていられないので、気付いてから足すくらいの気持ちで良い。
+			</p>
+		</section>
+	</section>
+</section>
+
+<section xml:id="nostd-support">
+	<title>おまけ: nostd, alloc 対応</title>
+
+	<p>
+		組み込みなど制限された環境などでは std が使えなかったり、 alloc が使えなかったりする。
+		しかし独自スライス型だけであれば alloc が使えない環境でも利用可能なはずである<footnote xml:id="footnote-validator-would-require-allocation" refmark-id="footnote-ref-validator-would-require-allocation">
+			もちろん検査関数 (あるいはパーサ) がメモリアロケーションを必要とする場合は、検査ができないので alloc 無効環境に対応しょうとするのは無意味だが。
+		</footnote>。
+		以下では、検査で alloc が必要ない場合にどの環境でどこまで実装できるかを簡単に紹介する。
+	</p>
+	<table>
+		<caption>各環境で使える機能</caption>
+		<thead>
+			<tr>
+				<th rowspan="2">機能</th>
+				<th colspan="3">環境</th>
+				<th rowspan="2">註記</th>
+			</tr>
+			<tr>
+				<th>core</th>
+				<th>alloc</th>
+				<th>std</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<th>独自スライス型</th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+			</tr>
+			<tr>
+				<th>所有権付きスライス型</th>
+				<td>△</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					所有権付きスライス型でアロケーションしなければ core 環境でも問題ない (たとえば内部の型として <code>[u8; 6]</code> を使うなど)。
+					ただし <code>Cow</code> と <code>ToOwned</code> は core 環境では使えない。
+				</td>
+			</tr>
+			<tr>
+				<th><code>Box</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::boxed::Box</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Rc</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::rc::Rc</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Arc</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::sync::Arc</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Cow</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::borrow::Cow</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>str</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					組み込み型
+				</td>
+			</tr>
+			<tr>
+				<th><code>[T]</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					組み込み型
+				</td>
+			</tr>
+			<tr>
+				<th><code>String</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::string::String</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Vec</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::vec::Vec</code>
+				</td>
+			</tr>
+			<tr>
+				<th>エラー型への <code>Error</code> トレイト実装</th>
+				<td>×</td>
+				<td>×</td>
+				<td>○</td>
+				<td>
+					<code>std::error::Error</code> は <code>alloc</code> に存在しない。
+					<code>Error</code> トレイトを実装せずともエラー型として使うことは可能なので、そこまで気にする必要はない。
+				</td>
+			</tr>
+			<tr>
+				<th><code>From</code>, <code>TryFrom</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::convert::{From, TryFrom}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>FromStr</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::str::FromStr</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>AsRef</code>, <code>AsMut</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::convert::{AsRef, AsMut}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Deref</code>, <code>DerefMut</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::ops::{Deref, DerefMut}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Debug</code>, <code>Display</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::fmt::{Debug, Display}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Borrow</code>, <code>BorrowMut</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::borrow::{Borrow, BorrowMut}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>ToOwned</code></th>
+				<td>×</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>alloc::borrow::ToOwned</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>Default</code></th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::default::Default</code>
+				</td>
+			</tr>
+			<tr>
+				<th>比較 (<code>PartialEq</code>, <code>PartialOrd</code>, <code>Eq</code>, <code>Ord</code>)</th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					<code>core::cmp::{PartialEq, PartialOrd, Eq, Ord}</code>
+				</td>
+			</tr>
+			<tr>
+				<th><code>serde</code> 対応</th>
+				<td>○</td>
+				<td>○</td>
+				<td>○</td>
+				<td>
+					serde は (少なくとも v1.0.118 時点で既に) nostd / alloc 対応している。
+					<code>alloc</code> feature と <code>std</code> feature で制御できる。
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<section xml:id="nostd-support--how-to">
+		<title>どう対応すべきか</title>
+
+		<section xml:id="nostd-support--how-to--cargo-toml">
+			<title><filename>Cargo.toml</filename></title>
+
+			<p>
+				まず、 <filename>Cargo.toml</filename> で feature を宣言する。
+			</p>
+			<figure>
+				<programlisting language="toml"><![CDATA[[features]
+default = ["std"]
+
+alloc = []
+std = ["alloc"]]]></programlisting>
+				<caption><filename>Cargo.toml</filename> 抜粋</caption>
+			</figure>
+			<p>
+				<code>std</code> feature はデフォルトで有効にする慣習である。
+				<code>std</code> が使える環境では当然 <code>alloc</code> も使えるので、 <code>std</code> から <code>alloc</code> への依存を設定する。
+				これにより、「std または alloc が使える場合」という判定を単に「alloc が使える場合」で済ますことができる。
+			</p>
+			<p>
+				serde にも対応する場合に feature flag をどうすべきかは微妙である。
+				たぶん<time datetime="2020-12-23">2020年時点</time>で定石はない。
+				たとえば <code>alloc = ["serde/alloc"]</code> などとしてしまうと <code>serde</code> feature を有効化していないのに <code>alloc</code> や <code>std</code> 環境で勝手に <code>serde</code> への依存が発生するなどという悲しいことになる。
+				ひとつの解決策は、諦めてバラバラのフラグにすることである。
+			</p>
+			<figure>
+				<programlisting language="toml"><![CDATA[[features]
+default = ["std"]
+
+alloc = []
+std = ["alloc"]
+
+serde-alloc = ["serde/alloc"]
+serde-std = ["serde/std"]
+
+[dependencies]
+
+[dependencies.serde]
+version = "1.0.118"
+optional = true
+default-features = false
+features = ["derive"]]]></programlisting>
+				<caption>serde に雑に対応した <filename>Cargo.toml</filename> 抜粋</caption>
+			</figure>
+			<p>
+				たぶんこれがいちばん無難だと思う。
+				根本的な問題は「特定の複数の feature が有効化されていたときのみ、別の特定の feature を有効化する」という指定の仕様が存在しないところであり、 cargo の仕様を変更せず知恵だけで綺麗に解決できるという類のものではなさそうである。
+				当面は workaround で誤魔化してやっていくしかない。
+			</p>
+		</section>
+
+		<section xml:id="nostd-support--how-to--lib-rs">
+			<title><filename>lib.rs</filename></title>
+
+			<p>
+				べつに <filename>main.rs</filename> でも良いのだが、ここまで面倒なことをするなら普通はライブラリにするだろうから、以後 <filename>lib.rs</filename> の前提でいく。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#![cfg_attr(not(feature = "alloc"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;]]></programlisting>
+				<caption><filename>lib.rs</filename> 冒頭付近抜粋</caption>
+			</figure>
+			<p>
+				ここでする必要があることは2つで、必要に応じて <code>no_std</code> attribute を有効にすること、必要に応じて <code>extern crate alloc;</code> することである。
+			</p>
+			<programlisting language="rust"><![CDATA[#![cfg_attr(not(feature = "std"), no_std)]]]></programlisting>
+			<p>
+				まず、 <code>std</code> feature が有効化されていないとき、コンパイラに <code>std</code> ライブラリを使わないよう伝える。
+				これはクレート全体に反映されるべき設定なので <code>#![]</code> で書く。
+			</p>
+			<programlisting language="rust"><![CDATA[#[cfg(feature = "alloc")]
+extern crate alloc;]]></programlisting>
+			<p>
+				そして、 <code>alloc</code> feature が有効化されているとき、 <code>alloc</code> クレートが使えるようにする。
+				ここで <code>cfg(feature = "alloc")</code> という条件は次のアイテム <code>extern crate alloc;</code> にだけ指定したいものなので、 <code>#[]</code> で書く。
+				これらを間違うと、たとえば alloc feature が無効なときクレートの全ての内容がコンパイル結果から消え去ったりするので、タイプミスに注意。
+			</p>
+			<note>
+				<title><code>extern crate</code></title>
+
+				<p>
+					edition 2018 であっても、 alloc のためには <code>extern crate alloc;</code> と書かなければならない。
+					いずれ改善されることを期待したい。
+				</p>
+			</note>
+			<p>
+				std 環境では <code>use</code> なしに <code>String</code> や <code>Vec</code> 等が使えているが、これは <link xl:href="https://doc.rust-lang.org/1.48.0/std/prelude/v1/index.html"><code>std::prelude::v1</code></link> 内のアイテムが自動で探索されることになっているからである。
+				しかし no_std な alloc 環境では、 prelude が使えない<footnote xml:id="footnote-alloc-prelude" refmark-id="footnote-ref-alloc-prelude">
+					experimental な <link xl:href="https://doc.rust-lang.org/stable/alloc/prelude/v1/index.html"><code>alloc::prelude::v1</code></link> が存在してるようだが、たぶん普通に Rust 1.48.0 を使っていてもこれが prelude として使われないのだと思われる
+				</footnote>。
+				このままでは alloc と std でできることはほとんど同じなのに書き分けが必要になってしまい、不便である。
+			</p>
+			<p>
+					これを解決するのが <code language="rust">#[cfg(feature = "alloc")] extern crate alloc;</code> である。
+				「<code>alloc</code> feature が有効化されているとき」というのが <code>std</code> が有効化されている場合も含むのがミソで、つまり std 環境でも同じ型がたとえば <code>String</code> (これは prelude 経由でアクセスできる <code>std::string::String</code> である) と <code>alloc::string::String</code> の2種類使えるようになるのである。
+				2種類のうち alloc で使える方を std でも常に使ってやることにすれば、 (<code>Error</code> トレイト以外では) 書き分けの必要がなくなる。
+			</p>
+		</section>
+
+		<section xml:id="nostd-support--how-to--referring-items">
+			<title>アイテムの参照</title>
+
+			<p>
+				alloc と std に楽に対応する準備ができたわけだが、まずは core 環境で使えるものの書き方から確認していこう。
+			</p>
+			<p>
+				とはいっても、基本的に core 環境ではそこまで深く考えることはない。
+				<strong><code>std</code> で参照していたアイテムパスを全て <code>core</code> から参照する</strong> くらいである。
+				たとえば <code>use std::fmt;</code> の代わりに <code>use core::fmt;</code> と書くとか、その程度のことである。
+			</p>
+			<p>
+				alloc と std の方は注意が必要で、やり方が2種類程度ある。
+				ひとつはファイル先頭で std の prelude 相当のものを <code>alloc</code> から事前に use する方法。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "alloc")]
+use alloc::{borrow::ToOwned, string::String};]]></programlisting>
+				<caption>各 <filename>*.rs</filename> 冒頭付近抜粋</caption>
+			</figure>
+			<p>
+				この方法は、規模や使い方によっては手間がかかることがある。
+				というのも、何かが必要になってからいちいちファイル先頭に戻って編集する必要があったり、ファイルを複数に分割したとき unused import が大量発生する場合があったり、トレイト実装を別ファイルに異動したとき use の書き直しが必要だったりと、管理が面倒だからである。
+			</p>
+			<p>
+				もうひとつの方法は、アイテムを参照するときに毎回 <code>alloc::</code> から始まるパスで参照すること。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "alloc")]
+impl alloc::borrow::ToOwned for AsciiStr {
+    type Owned = AsciiString;
+
+    fn to_owned(&self) -> Self::Owned {
+        let s = self.as_str();
+        unsafe {
+            // SAFETY: Valid `AsciiStr` string is also valid as `AsciiString`.
+            AsciiString::new_unchecked(s.to_owned())
+        }
+    }
+}]]></programlisting>
+				<caption><code>ToOwned</code> の実装例</caption>
+			</figure>
+			<p>
+				要するに、いちいち <code>alloc::borrow::ToOwned</code> などのように指定してやれば、 std 用の prelude が利用可能か否かに関係なくアイテムを参照できるということである。
+			</p>
+		</section>
+
+		<section xml:id="nostd-support--how-to--splitting-modules">
+			<title>モジュール分割</title>
+
+			<p>
+				<code>alloc</code> feature 有効時にしか有効化されるべきでない型定義やトレイト実装が多数あるわけだが、それらに毎度 <code language="rust">#[cfg(feature = "alloc")]</code> と付けていくのは面倒すぎる。
+				そこで、適当な子モジュールに吐き出してしまうと楽になる。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[// ここに core 用の定義
+
+#[cfg(feature = "alloc")]
+mod owned {
+    // ここに alloc / std 用の定義
+    // `use alloc::string::String;` などしてもよい
+}]]></programlisting>
+				<caption>モジュール分割の一例</caption>
+			</figure>
+			<p>
+				このように条件付きでコンパイルされるコード群を別モジュールに吐き出すことで、 <code language="rust">#[cfg(feature = "alloc")]</code> を何度も書く必要がなくなり、可読性と保守性の向上が期待できる。
+			</p>
+			<p>
+				上の例ではインラインでモジュールを定義したが、もちろん別ファイルにしてもよい。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "alloc")]
+mod owned; // owned.rs 内に alloc / std 用の定義
+
+// ここに core 用の定義]]></programlisting>
+				<caption>モジュール分割の一例</caption>
+			</figure>
+			<p>
+				この辺りは規模と好みの問題だろう。
+				迷ったなら無難にファイルを分割するのが良いと思う。
+			</p>
+		</section>
+	</section>
+</section>
+
+<section xml:id="omake-serde-support">
+	<title>おまけ: serde 対応</title>
+
+	<important>
+		<title>TODO</title>
+
+		<p>
+			そろそろ寝ないと論理明日の労働がヤバいので、論理明日に書きます……
+		</p>
+	</important>
+</section>
+
+<section xml:id="references">
+	<title>参考リンク</title>
+
+	<ul>
+		<li>
+			<phrase>
+				メモリレイアウト関係
+			</phrase>
+			<ul>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/reference/type-layout.html">Type layout - The Rust Reference</link>
+				</li>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent">Other reprs - The Rustonomicon</link>
+				</li>
+				<li>
+					<link xl:href="https://rust-lang.github.io/rfcs/1758-repr-transparent.html">1758-repr-transparent - The Rust RFC Book</link>
+				</li>
+				<li>
+					<link xl:href="https://doc.rust-lang.org/1.48.0/std/boxed/index.html#memory-layout">std::boxed - Rust, "Memory layout" セクション</link>
+				</li>
+			</ul>
+		</li>
+		<li>
+			<phrase>
+				本記事の筆者による実用文字列型の実装例
+			</phrase>
+			<ul>
+				<li>
+					<link xl:href="https://crates.io/crates/iri-string"><code>iri-string</code></link> クレート
+					<ul>
+						<li>
+							型パラメータとして文法を定める規格を受け取るような、多相な文字列型を実装している
+							(例: <link xl:href="https://docs.rs/iri-string/0.3.0/iri_string/spec/trait.Spec.html">規格表現用 <code>Spec</code> トレイト</link>、
+							<link xl:href="https://docs.rs/iri-string/0.3.0/iri_string/types/struct.RiAbsoluteStr.html"><code>RiAbsoluteStr</code> 文字列型</link>、
+							<code><![CDATA[RiAbsoluteStr<IriSpec>]]></code> の別名である <link xl:href="https://docs.rs/iri-string/0.3.0/iri_string/types/type.IriAbsoluteStr.html"><code>IriAbsoluteStr</code> 文字列型</link>)。
+						</li>
+					</ul>
+				</li>
+				<li>
+					<link xl:href="https://crates.io/crates/datetime-string"><code>datetime-string</code></link> クレート
+				</li>
+				<li>
+					<link xl:href="https://crates.io/crates/xml-string"><code>xml-string</code></link> クレート
+				</li>
+			</ul>
+		</li>
+	</ul>
+</section>
+
+</article>

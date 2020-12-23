@@ -1,0 +1,33 @@
+///bin/true <<//
+/*
+//
+cd "$(dirname "$(readlink -f "$0")")"
+dot -Tsvg "$0" -o "$(basename "$0" .dot)".svg
+exit
+*/
+
+digraph G {
+	node [
+		shape = record,
+		fontname = monospace,
+	];
+	//foo [label = "{&amp;[u8] | { { pointer: *const u8 | 0xff000000 } | { length: usize | 8 } }}"];
+	u8slice [
+		shape = none,
+		label = <
+			<table border='0' cellspacing='0' cellborder='1' cellpadding='5'>
+				<tr>
+					<td colspan='2'>&amp;[u8]</td>
+				</tr>
+				<tr>
+					<td bgcolor='lightskyblue'>pointer: *const u8</td>
+					<td bgcolor='wheat'>length: usize</td>
+				</tr>
+				<tr>
+					<td bgcolor='lightskyblue'>0xff000000</td>
+					<td bgcolor='wheat'>8</td>
+				</tr>
+			</table>
+		>,
+	]
+}
