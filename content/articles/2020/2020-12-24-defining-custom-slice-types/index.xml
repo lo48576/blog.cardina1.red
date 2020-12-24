@@ -2533,6 +2533,9 @@ impl std::borrow::ToOwned for MyStr {
         MyString::new(s.to_owned())
     }
 }]]></programlisting>
+			<caption>
+				所有権なしのスライス型と所有権付きの型を相互に紐付ける
+			</caption>
 		</figure>
 		<p>
 			<code><![CDATA[Borrow<T>]]></code> は <code>T</code> 型の参照を取り出すためのトレイトである。
