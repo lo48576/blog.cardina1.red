@@ -1,9 +1,9 @@
 ---
 created_at: 2020-12-14T19:27:07+09:00
 published_at: 2020-12-24T05:13:05+09:00
-updated_at: 2020-12-24T05:55:01+09:00
+updated_at: 2020-12-24T23:26:43+09:00
 format: article2019
-title: "Rust で独自のスライス型や文字列型を定義する"
+title: "Rust (1.48.0) で独自のスライス型や文字列型を定義する"
 tags:
   - advent-calendar
   - prog-rust
@@ -35,6 +35,7 @@ excerpt: "Rust で str や Path のような独自のスライス型を定義す
 </p>
 <p>
 	あまりに詳細すぎてコード例がクッソ長いため、あとでどこかに動く状態のコードを置いておくつもり。
+	なお、この記事は <link xl:href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC-BY 4.0</link> ライセンスで、記事中のソースコードは (本記事の筆者以外によるプロジェクトからの引用を除いて) <link xl:href="https://creativecommons.org/publicdomain/zero/1.0/deed.ja">CC0 1.0</link> ライセンスで提供される。
 	<!-- TODO -->
 </p>
 <p>
@@ -1138,10 +1139,9 @@ impl AsciiBytes {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that the content of the slice is valid ASCII string before the
-    /// borrow ends and the underlying `AsciiStr` is used.
+    /// The caller must ensure that the string is an ASCII string when the borrow ends.
     ///
-    /// Use of an `AsciiStr` whose contents are not valid ASCII characters is undefined behavior.
+    /// Use of an `AsciiStr` which contains non-ASCII characters is undefined behavior.
     #[inline]
     #[must_use]
     pub unsafe fn as_mut_str(&mut self) -> &mut str {
