@@ -1,7 +1,7 @@
 ---
 created_at: 2020-12-14T19:27:07+09:00
 published_at: 2020-12-24T05:13:05+09:00
-updated_at: 2020-12-24T23:26:43+09:00
+updated_at: 2020-12-26T19:40:17+09:00
 format: article2019
 title: "Rust (1.48.0) で独自のスライス型や文字列型を定義する"
 tags:
@@ -15,6 +15,7 @@ excerpt: "Rust で str や Path のような独自のスライス型を定義す
 <article
 	xmlns="https://www.cardina1.red/_ns/doc2019"
 	xmlns:xl="http://www.w3.org/1999/xlink"
+	xmlns:h="http://www.w3.org/1999/xhtml"
 	xml:id="article-2019-12-23-defining-custom-slice-types"
 	xml:lang="ja"
 	version="0.1"
@@ -3303,16 +3304,781 @@ mod owned; // owned.rs 内に alloc / std 用の定義
 	</section>
 </section>
 
-<section xml:id="omake-serde-support">
+<section xml:id="serde-support">
 	<title>おまけ: serde 対応</title>
 
-	<important>
-		<title>TODO</title>
+	<p>
+		nostd 対応した状態で、加えて serde 対応を追加する例を提示する。
+		nostd 等を考えない場合は、単に <code>std</code> feature や <code>alloc</code> feature 関係の分岐等をなくして素直に std 環境用に書けば良いだけなので、例を参考に簡単に書けるだろう。
+	</p>
+
+	<section xml:id="serde-support--cargo-toml">
+		<title><filename>Cargo.toml</filename></title>
 
 		<p>
-			そろそろ寝ないと論理明日の労働がヤバいので、論理明日に書きます……
+			何はともあれ <filename>Cargo.toml</filename> からである。
 		</p>
-	</important>
+		<figure>
+			<programlisting language="toml"><![CDATA[[features]
+default = ["std"]
+
+alloc = []
+std = ["alloc"]
+
+serde-alloc = ["serde/alloc"]
+serde-std = ["serde/std"]
+
+[dependencies]
+
+[dependencies.serde]
+version = "1.0.118"
+optional = true
+default-features = false
+features = ["derive"]]]></programlisting>
+			<caption>serde への依存を設定した <filename>Cargo.toml</filename> の例 (抜粋)</caption>
+		</figure>
+		<p>
+			serde はデフォルトで <code>std</code> feature を有効化しているので、明示的な無効化のために <code>default-features = false</code> が必要である。
+		</p>
+		<blockquote cite="https://serde.rs/no-std.html">
+			<p>
+				The <code>serde</code> crate has a Cargo feature named <code>"std"</code> that is enabled by default.
+				In order to use Serde in a no_std context this feature needs to be disabled.
+				Modify your Serde dependency in Cargo.toml to opt out of enabled-by-default features.
+			</p>
+			<footer>
+				<link xl:href="https://serde.rs/no-std.html">No-std support · Serde</link>,
+				<time datetime="2020-12-25T00:19:20+09:00">2020-12-25 閲覧</time>
+			</footer>
+		</blockquote>
+		<p>
+			<code>serde</code> クレートのバージョンを指定するときは、<link xl:href="/2020/12/14/dont-leave-cargo-toml-broken/">特別な理由がなければ最新のバージョンを指定すること</link>。
+		</p>
+	</section>
+
+	<section xml:id="serde-support--lib-rs">
+		<title><filename>lib.rs</filename></title>
+
+		<p>
+			まず、必須ではないが便利な仕掛けとして、適切な serde の feature が有効化されていないときに、実際に serde を使っている場所よりも早い段階で <filename>lib.rs</filename> からエラーを出すことができる。
+				serde に <code>String</code> や <code>Vec</code> をサポートさせるには <code>alloc</code> か <code>std</code> feature を有効化する必要があり、 <code>alloc</code> は<time datetime="2020-12-25">今</time>のところ nightly rustc が必要らしい。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[#[cfg(all(
+    feature = "serde",
+    feature = "alloc",
+    not(feature = "std"),
+    not(any(feature = "serde-alloc", feature = "serde-std"))
+))]
+compile_error!(
+    "When both `serde` and `alloc` features are enabled,
+     `serde-alloc` or `serde-std` should also be enabled."
+);
+
+#[cfg(all(feature = "serde", feature = "std", not(feature = "serde-std")))]
+compile_error!(
+    "When both `serde` and `std` features are enabled, `serde-std` should also be enabled."
+);]]></programlisting>
+			<caption>適切な feature が設定されているか確認する <filename>lib.rs</filename> の例 (抜粋)</caption>
+		</figure>
+		<p>
+				構造としては、マズい組み合わせだった (具体的には、 feature が不足していた) ときに <link xl:href="https://doc.rust-lang.org/1.48.0/core/macro.compile_error.html"><code>compile_error!</code></link> マクロでメッセージとともにコンパイルエラーを発生させるという簡単なものである。
+		</p>
+		<figure>
+			<mediaobject>
+				<img src="serde-feature-compile-error.png" alt="compile_error" />
+			</mediaobject>
+			<h:details>
+				<h:summary>テキスト</h:summary>
+				<screen role="terminal"><prompt>$ </prompt><userinput>cargo clippy --features=serde</userinput><![CDATA[
+    Checking blog-custom-slice v0.1.0 (/home/lo48576/temp/working/blog-custom-slice)
+error: When both `serde` and `std` features are enabled, `serde-std` should also be enabled.
+  --> src/lib.rs:13:1
+   |
+13 | / compile_error!(
+14 | |     "When both `serde` and `std` features are enabled, `serde-std` should also be enabled."
+15 | | );
+   | |__^
+
+error: aborting due to previous error
+
+error: could not compile `blog-custom-slice`
+
+To learn more, run the command again with --verbose.
+]]><prompt>$</prompt></screen>
+			</h:details>
+			<caption>
+				<code>compile_error!</code> マクロのおかげで、エラーの根本的な原因が明確に提示できる
+			</caption>
+		</figure>
+		<p>
+			まず std 用の方から解説しよう。
+		</p>
+		<programlisting language="rust"><![CDATA[#[cfg(all(feature = "serde", feature = "std", not(feature = "serde-std")))]]]></programlisting>
+		<p>
+			<code>all()</code> 内の条件指定のうち最初の2つ、 <code>feature = "serde"</code> と <code>feature = "std"</code> がそれぞれ「<code>serde</code> feature が有効である」と「<code>std</code> feature が有効である」という条件、最後の <code>not(feature = "serde-std")</code> が「<code>serde-std</code> feature が<strong>有効でない</strong>」という条件である。
+			<code>all()</code> は名前の通り「すべての条件が成り立っている」という条件である。
+			これらを組み合わせて、「<code>serde</code> と <code>std</code> feature が有効で、かつ <code>serde-std</code> feature が無効である場合」という条件になる。
+		</p>
+		<programlisting language="rust"><![CDATA[compile_error!(
+    "When both `serde` and `std` features are enabled, `serde-std` should also be enabled."
+);]]></programlisting>
+		<p>
+			<link xl:href="https://doc.rust-lang.org/1.48.0/core/macro.compile_error.html"><code>compile_error!</code></link> マクロは与えた文字列をエラーメッセージとして出力してコンパイルエラーを発生させる。
+		</p>
+		<programlisting language="rust"><![CDATA[#[cfg(all(
+    feature = "serde",
+    feature = "alloc",
+    not(feature = "std"),
+    not(any(feature = "serde-alloc", feature = "serde-std"))
+))]]]></programlisting>
+		<p>
+			alloc 用の条件は少々複雑だが、根本的には同じである。
+			std との違いは <code>not(feature = "std")</code> が追加されている点と、 <code>not(feature = "serde-std")</code> の代わりに <code>not(any(feature = "serde-alloc", feature = "serde-std"))</code> が指定されている点である。
+		</p>
+		<p>
+			<code>not(feature = "std")</code> は必須ではないが、これがないと <code>std</code> feature が有効なときまで alloc 環境用のメッセージが一緒に出てしまう。
+			これは <code>std</code> feature が自動的に <code>alloc</code> feature も有効化するよう <link linkend="nostd-support--how-to--cargo-toml"><filename>Cargo.toml</filename> で設定した</link>からである。
+			<code>not(feature = "std")</code> を条件に追加することで、 <code>std</code> が有効な場合を除外できる。
+		</p>
+		<p>
+			<code>any()</code> は「中の条件のひとつ以上が有効である」という条件である。
+			このことから <code>not(any(feature = "serde-alloc", feature = "serde-std"))</code> は文字通り「<code>serde-alloc</code> も <code>serde-std</code> も有効でない」という条件であるとわかる。
+			<code>all(not(feature = "serde-alloc"), not(feature = "serde-std"))</code> と書いても同じことであるが、 <code>not()</code> を複数回書くことになるので若干長くなり読みづらいかもしれない。
+		</p>
+		<p>
+			これで「<code>serde</code> と <code>alloc</code> feature が有効で、しかし <code>std</code> feature は有効でなく、また <code>serde-alloc</code> feature も <code>serde-std</code> feature も有効でない」という条件が指定できた。
+		</p>
+		<programlisting language="rust"><![CDATA[compile_error!(
+    "When both `serde` and `alloc` features are enabled,
+     `serde-alloc` or `serde-std` should also be enabled."
+);]]></programlisting>
+		<p>
+			残りはもう解説の必要はないだろう。
+			std 用のものをコピペしたきりメッセージを変え忘れたりしないよう注意しよう。 (←忘れていて首をひねったことがある顔)
+		</p>
+	</section>
+
+	<section xml:id="serde-support--serialize">
+		<title><code>serde::Serialize</code> の実装</title>
+
+		<p>
+			serialize は楽である。
+			内部の型と同じように扱ってよいのであれば、 <code>#[derive(serde::Serialize)]</code> と <code>#[serde(transparent)]</code> を指定するだけである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[/// My string.
+#[repr(transparent)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct MyStr(str);]]></programlisting>
+			<caption>ごく普通な serde の使い方</caption>
+		</figure>
+		<p>
+			<code>cfg_attr</code> は、もし第1引数の条件が成立している場合は第2引数の attribute を有効化するというものである。
+			ここで誤って <code>cfg_attr()</code> でなく <code>cfg()</code> を使うと、型定義ごと無視されることになるので注意。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[// **誤った定義例**
+/// My string.
+#[repr(transparent)]
+// ↓ こうすると、 `serde` feature が無効なとき
+// `derive(..)` どころでなく `MyStr` の型定義が無視される。
+#[cfg(feature = "serde")]
+#[derive(serde::Serialize)]
+pub struct MyStr(str);]]></programlisting>
+			<caption><code>#[cfg(..)]</code> は次の <code>#[..]</code> などではなく、アイテム (つまり型定義) 全体に適用される</caption>
+		</figure>
+		<p>
+			<code>#[serde(transparent)]</code> は、まさに strong typedef された型のための属性である。
+			その効果は、外側の包んでいる型の存在を無視して、 derive された <code>Serialize</code> や <code>Deserialize</code> の実装で内部の型を透過的に利用するというものである。
+			上の例では、 <code>MyStr</code> によって包まれているということを無視して <code>str</code> を読むのと同様な <code>Serialize</code> 実装を生やしてくれるようになる。
+		</p>
+		<blockquote cite="https://serde.rs/container-attrs.html#transparent">
+			<p>
+				Serialize and deserialize a newtype struct or a braced struct with one field exactly the same
+				as if its one field were serialized and deserialized by itself.
+				Analogous to <code>#[repr(transparent)]</code>.
+			</p>
+			<footer>
+				<link xl:href="https://serde.rs/container-attrs.html#transparent">Container attributes · Serde</link>, <time datetime="2020-12-25T01:46:44+09:00">2020-12-25</time> 閲覧
+			</footer>
+		</blockquote>
+		<p>
+			もし内部の型と別の形式でシリアライズしたいときは、素直に実装することになる。
+			serde の serialize は (deserialize と比べると) かなり簡単なので、実際のコードの例を載せておく。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[/// String slice for a time in RFC 3339 [`full-time`] format, such as `12:34:56.7890-23:12`.
+///
+/// [`full-time`]: https://tools.ietf.org/html/rfc3339#section-5.6
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+// Note that `derive(Serialize)` cannot used here, because it encodes this as
+// `[u8]` rather than as a string.
+//
+// Comparisons implemented for the type are consistent (at least it is intended to be so).
+// See <https://github.com/rust-lang/rust-clippy/issues/2025>.
+// Note that `clippy::derive_ord_xor_partial_ord` would be introduced since Rust 1.47.0.
+#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::unknown_clippy_lints, clippy::derive_ord_xor_partial_ord)]
+pub struct FullTimeStr([u8]);
+
+/* 中略 */
+
+#[cfg(feature = "serde")]
+impl Serialize for FullTimeStr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}]]></programlisting>
+			<caption>
+				<link xl:href="https://crates.io/crates/datetime-string/0.2.1">datetime-string v0.2.1 クレート</link> の <code>FullTimeStr</code> 型
+				(<link xl:href="https://gitlab.com/lo48576/datetime-string/-/blob/v0.2.1/src/rfc3339/full_time.rs"><filename>src/rfc3339/full_time.rs</filename></link>,
+				<link xl:href="https://gitlab.com/lo48576/datetime-string/-/blob/v0.2.1/src/rfc3339/full_time.rs#L40-53">40–53行 (型定義)</link>,
+				<link xl:href="https://gitlab.com/lo48576/datetime-string/-/blob/v0.2.1/src/rfc3339/full_time.rs#L558-566">558–566行 (実装)</link>)。
+				この型は ASCII 文字列ではあるが、内部処理の実装しやすさの都合で <code>str</code> でなく <code>[u8]</code> を内部の型として使っている。
+			</caption>
+		</figure>
+	</section>
+
+	<section xml:id="serde-support--deserialize">
+		<title><code>serde::Deserialize</code> の実装</title>
+
+		<p>
+			残念ながら <code>Deserialize</code> の実装は面倒である。
+		</p>
+
+		<section xml:id="serde-support--deserialize--slice">
+			<title>所有権なしのスライス型</title>
+
+			<p>
+				まず、独自スライス型等の DST については <code>derive(serde::Deserialize)</code> は不可能である。
+				なぜなら、 <code>Deserialize</code> は対象の型の値そのものを返すため、型のサイズがコンパイル時に判明していることを要求するからである。
+				仕方がないので手動で実装するほかない。
+			</p>
+
+			<section xml:id="serde-support--deserialize--slice--infallible">
+				<title>追加の制約なしの場合</title>
+
+				<figure>
+					<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for &'de MyStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Visitor;
+
+        /// Visitor for `&MyStr`.
+        struct StrVisitor;
+
+        impl<'de> Visitor<'de> for StrVisitor {
+            type Value = &'de MyStr;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a string")
+            }
+
+            #[inline]
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Self::Value::from(v))
+            }
+        }
+
+        deserializer.deserialize_str(StrVisitor)
+    }
+}]]></programlisting>
+					<caption>追加の制約なしのスライス型での <code>Deserialize</code> 実装</caption>
+				</figure>
+				<p>
+					<code>serde::Deserialize</code> は <code>serde::Serialize</code> と同じく、 作りたい型に対して実装するトレイトである。
+						今回作りたい型は独自スライス型自体ではなく、その参照型である。
+						実際、上の例では <code>MyStr</code> 自体ではなく <code>&amp;MyStr</code> に実装している。
+						参照型を作るとき serde への入力は可変でない参照として渡されるため、 <code>&amp;mut MyStr</code> などへの実装はそもそも無理であり、考える必要はない。
+				</p>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for &'de MyStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+]]></programlisting>
+				<p>
+					serde にお決まりの形である。
+					詳しく考えたければ <link xl:href="https://serde.rs/impl-deserialize.html">serde のドキュメント</link>を参照した方が良いだろう。
+					<code><![CDATA[serde::Deserialize<'de>]]></code> の <code>'de</code> は入力データの lifetime であるが、これが <code>&amp;'de MyStr</code> のように出力の型に表れているということは、すなわち入力データを他の場所にコピーすることなくそのまま参照できる (その可能性がある) ということを意味している。
+				</p>
+				<programlisting language="rust"><![CDATA[        /// Visitor for `&MyStr`.
+        struct StrVisitor;]]></programlisting>
+				<p>
+					<code>Deserialize</code> の実装には、 visitor という役割を果たす値が必要になり、通常は専用の型を用意する。
+					これをモジュール直下に定義しても良いのだが、そうするとたったひとつの関数でしか使わない型がモジュールにぶち撒けられることになり、あまり気持ちよくない。
+					あるいは実装を他の場所に移そうとしたとき、一緒に移動し忘れる可能性もある。
+						そこで、今回定義する visitor である <code>StrVisitor</code> とそれへのトレイト実装は、 <code>deserialize</code> 関数内に書いてしまうことにする。
+				</p>
+				<p>
+					visitor は <code>serde::de::Visitor</code> が実装された型で、入力データの一部である何かしらの値について、その型やフィールド名等の情報を適切に利用して Rust 上の目的の型へと変換する。
+					詳細については<link xl:href="https://serde.rs/impl-deserialize.html#the-visitor-trait">公式ドキュメント</link>を参照。
+				</p>
+				<programlisting language="rust"><![CDATA[        impl<'de> serde::de::Visitor<'de> for StrVisitor {
+            type Value = &'de MyStr;]]></programlisting>
+				<p>
+					今回実装する visitor は <code>&amp;'de MyStr</code> を作るためのものだから、関連型 <code>Value</code> を <code>&amp;'de MyStr</code> とする。
+				</p>
+				<programlisting language="rust"><![CDATA[            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a string")
+            }]]></programlisting>
+				<p>
+					<link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#tymethod.expecting"><code>Visitor::expecting()</code></link> は、 visitor が読もうとしている対象の型を端的に表現する文言を出力する。
+					読み込み失敗時に serde (deserializer) が「○○を読もうとしたけどだめだった」というエラーを返すが、この「○○」に該当する語句を出力するということである。
+				</p>
+				<p>
+					もし visitor が動的な情報や内部状態を持っていれば、たとえば <code language="rust">write!(f, "an integer between {} and {}", self.min, self.max)</code> のように <code>write!</code> マクロを使うのが楽かもしれない。
+				今回読みたい文字列型でそのような追加情報はないため、 <link xl:href="https://doc.rust-lang.org/stable/core/fmt/struct.Formatter.html#method.write_str"><code>Formatter::write_str</code></link> で済ますことができる。
+				</p>
+				<programlisting language="rust"><![CDATA[            #[inline]
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {]]></programlisting>
+				<p>
+					<link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#method.visit_borrowed_str"><code>Visitor::visit_borrowed_str()</code></link> を実装することで、「入力データと同じ lifetime を持つ文字列からであれば、所望の型の値を作れる」と表明する。
+						作ろうとしている <code>&amp;'de MyStr</code> は入力データと同じ lifetime (<code>'de</code>) を持つ型なので、このメソッドを必ず実装する必要がある。
+				</p>
+				<p>
+					<link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#method.visit_str"><code>Visitor::visit_str()</code></link> もあるが、これは「<code>visit_str()</code> 中のみ生きている文字列から、所望の型を作れる」という表明になる。
+					残念ながらこの場合、与えられた文字列は <code>visit_str()</code> 終了後に破棄が許されてしまうため、入力と同じ lifetime (<code>'de</code>) を与えることはできない。
+					よって、このメソッドはデフォルト実装でエラーを返させる。
+					<link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#method.visit_string"><code>Visitor::visit_string()</code></link> についても同様に lifetime の不足の理由から手動での実装はしない。
+				</p>
+				<programlisting language="rust"><![CDATA[                // <StrVisitor as Visitor>::visit_borrowed_str() 内
+                Ok(Self::Value::from(v))
+            }
+        }]]></programlisting>
+				<p>
+					ここで <code>Self::Value</code> は <code><![CDATA[<Self as serde::de::Visitor>::Value]]></code> と等価で、すなわち <code>&amp;'de MyStr</code> である。
+					つまり、 <code>v: &amp;'de str</code> について <code><![CDATA[From<&'a str> for &'a MyStr]]></code> の実装を使うことで <code>&amp;'de MyStr</code> の値を作成する。
+					<code>&amp;'de MyStr</code> の作成は必ず成功するので、 <code>Ok()</code> で包んで返す。
+				</p>
+				<programlisting language="rust"><![CDATA[        // <&MyStr as Deserialize>::deserialize() 内
+        deserializer.deserialize_str(StrVisitor)
+    }
+}]]></programlisting>
+				<p>
+					さて <code>StrVisitor</code> の定義ができたので、肝心の <code>deserialize()</code> の実装が書ける。
+					ここでは絶対に borrowed str しか受け付けない visitor を書いたため <code>Deserializer::deserialize_str()</code> を利用しているが、もし複数種類の入力を受け付けたいのであれば <code>Deserializer::deserialize_any()</code> を使うべきである (詳細は<link linkend="serde-support--deserialize--slice--fallible-multiple-source-types">後述</link>)。
+					最初からここで <code>deserialize_any()</code> を使っても問題なく動くので、コピペミスが怖かったりマクロで自動生成したいなどであればそのようにするのが良いかもしれない。
+				</p>
+				<p>
+					一応挙動の理解に参考になりそうなテストも載せておこう。
+					解説はしないので、詳しくは serde のドキュメントやリファレンスを漁ってほしい。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+#[cfg(test)]
+mod serde_tests {
+    use super::*;
+
+    use serde::de::{
+        value::{BorrowedStrDeserializer, Error},
+        Deserialize, IntoDeserializer,
+    };
+
+    #[test]
+    fn deserialize_borrowed_str() {
+        let source_data = "hello";
+        let source_input = BorrowedStrDeserializer::<'_, Error>::new(source_data);
+        let mystr: &MyStr = <&MyStr>::deserialize(source_input).unwrap();
+        assert_eq!(mystr.as_str(), source_data);
+    }
+
+    #[test]
+    fn deserialize_owned_str() {
+        let source_input = "hello".to_owned().into_deserializer();
+        let result: Result<&MyStr, Error> = <&MyStr>::deserialize(source_input);
+        assert!(
+            result.is_err(),
+            "Deserialize is impossible when the source data does not have enough lifetime"
+        );
+    }
+}]]></programlisting>
+					<caption>
+							デシリアライズされた <code>&amp;MyStr</code> は入力以下の生存期間しか持てないため、デシリアライズ完了とともに破棄される owned な文字列 (<code>"hello".to_owned()</code>) からは <code>&amp;MyStr</code> を作ることができない
+					</caption>
+				</figure>
+			</section>
+
+			<section xml:id="serde-support--deserialize--slice--fallible-single-source-type">
+				<title>追加の制約ありで単一の型からしか読まない場合</title>
+
+				<figure>
+					<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for &'de AsciiStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        /// Visitor for `&AsciiStr`.
+        struct StrVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for StrVisitor {
+            type Value = &'de AsciiStr;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("an ASCII string")
+            }
+
+            #[inline]
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_str(StrVisitor)
+    }
+}]]></programlisting>
+					<caption>
+						追加の制約ありで、文字列だけからデシリアライズする場合
+					</caption>
+				</figure>
+				<p>
+					基本的に <link linkend="serde-support--deserialize--slice--infallible"><code>&amp;MyStr</code> の場合</link>と同じであるが、値の作成に失敗する可能性があるため、その場合のエラー処理は追加されている。
+				</p>
+				<programlisting language="rust"><![CDATA[                // <StrVisitor as Visitor>::visit_borrowed_str() 内
+                Self::Value::try_from(v).map_err(E::custom)]]></programlisting>
+				<p>
+					<code>Self::Value</code> は <code>&amp;'de AsciiStr</code> であるから <code><![CDATA[<&'de AsciiStr as TryFrom>::try_from()]]></code> で <code><![CDATA[Result<&amp;&'de AsciiStr, AsciiError>]]></code> を得るが、 <code>visit_borrowed_str()</code> は <code><![CDATA[Result<Self::Value, D::Error>]]></code> を返すため、エラー型を変換してやる必要がある。
+				</p>
+				<p>
+					ここで <code>D</code> すなわち deserializer の型はデータ形式 (たとえば json 、たとえば toml) 次第なので、データ型にとって未知の型を想定する必要があり、 <code><![CDATA[D: serde::Deserializer<'de>]]></code> を頼りに <link xl:href="https://docs.rs/serde/1.0.118/serde/trait.Deserializer.html"><code>Deserializer</code></link> トレイト経由で操作するしかない。
+					問題のエラー型 <code>D::Error</code> は <link xl:href="https://docs.rs/serde/1.0.118/serde/trait.Deserializer.html#associatedtype.Error"><code>Deserializer::Error</code> 関連型</link>であるから、これも未知の型を想定して <link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Error.html"><code>serde::de::Error</code></link> 経由でしか操作が行えないようになっている。
+					<link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Error.html#tymethod.custom"><code>serde::de::Error::custom()</code></link> は汎用的なエラーを返すもので、雑に使うことができる (あまりよろしくないが)。
+				</p>
+				<p>
+					ちなみに <code>serde::de::Error::custom()</code> は渡されるメッセージに制約を課しているため、今回の例のような使い方をするなら本当は <code><![CDATA[<AsciiError as core::fmt::Display>::fmt()]]></code> で表示するメッセージもちゃんと調整する必要がある。
+				</p>
+				<blockquote cite="https://docs.rs/serde/1.0.118/serde/de/trait.Error.html#tymethod.custom">
+					<p>
+						The message should not be capitalized and should not end with a period.
+					</p>
+					<footer>
+						serde v1.0.118 における <link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Error.html#tymethod.custom"><code>serde::de::Error::custom()</code> のドキュメント</link>
+					</footer>
+				</blockquote>
+				<p>
+					また、エラーをもっと正確に表現したいのであれば、 <code>serde::de::Error</code> の他のメソッドを使うことになる。
+					たとえば今回の例では、エラーの原因は型などではなく値の内容であるから、 <link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Error.html#method.invalid_value"><code>serde::de::Error::invalid_value()</code></link> を使って書くこともできる。
+					本当はこちらを使う方が望ましいかもしれない。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[                Self::Value::try_from(v)
+                    .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))]]></programlisting>
+					<caption>
+						より詳細に意味付けされた形でエラーを返す例
+					</caption>
+				</figure>
+			</section>
+
+			<section xml:id="serde-support--deserialize--slice--fallible-multiple-source-types">
+				<title>追加の制約ありで複数の型から読む場合</title>
+
+				<p>
+					<code>AsciiBytes</code> では、 <code>&amp;str</code> からだけでなく <code>&amp;[u8]</code> からもデシリアライズできるようにしよう。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for &'de AsciiBytes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        /// Visitor for `&AsciiBytes`.
+        struct BytesVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for BytesVisitor {
+            type Value = &'de AsciiBytes;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("ASCII bytes")
+            }
+
+            #[inline]
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_any(BytesVisitor)
+    }
+}]]></programlisting>
+					<caption>
+						追加の制約ありで、文字列とバイナリからデシリアライズする場合
+					</caption>
+				</figure>
+				<p>
+					骨格はだいたい同じだが、重要な違いは次の2箇所だけである。
+				</p>
+				<programlisting language="rust"><![CDATA[            #[inline]
+            fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }]]></programlisting>
+				<p>
+					まず、バイト列用の <code>visit_borrowed_bytes()</code> の実装を追加した。
+					これは <code>visit_borrowed_str()</code> の <code>str</code> でなく <code>[u8]</code> 版というだけなので、これ以上の説明は不要だろう。
+				</p>
+				<programlisting language="rust"><![CDATA[        // <BytesVisitor as Deserialize>::deserialize() 内
+        deserializer.deserialize_any(BytesVisitor)]]></programlisting>
+				<p>
+					それから、これまでの例では <code>deserialize_str()</code> を使っていたが、今回は <code>deserialize_any()</code> を使っている。
+					これは許容する型を単独で指定するのではなく、デシリアライザ (つまり読んでいるフォーマットについて知っている処理系) から型情報を受け取って、それに基いて値の作成を行うというものである。
+					今回の例では、たとえばデシリアライザがバイナリを読んだら <code>BytesVisitor::visit_borrowed_bytes()</code> が呼ばれ、文字列を読んだら <code>BytesVisitor::visit_borrowed_str()</code> が呼ばれるという挙動になる。
+				</p>
+			</section>
+		</section>
+
+		<section xml:id="serde-support--deserialize--owned">
+			<title>所有権付きの型</title>
+
+			<p>
+				幸いなことに、所有権なしのスライス型の実装とほとんど変わらない。
+				<code>From</code> や <code>TryFrom</code> 等を実装しておいたおかげである。
+			</p>
+			<p>
+				まずは追加の制約なしの型から。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for MyString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        /// Visitor for `MyString`.
+        struct StringVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for StringVisitor {
+            type Value = MyString;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a string")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Self::Value::from(v))
+            }
+
+            #[inline]
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Self::Value::from(v))
+            }
+        }
+
+        deserializer.deserialize_string(StringVisitor)
+    }
+}]]></programlisting>
+				<caption>追加の制約なしのスライス型で <code>Deserialize</code> を実装する</caption>
+			</figure>
+			<p>
+				着目すべきなのは、 <code>Visitor::Value</code> の設定と、 <code>visit_str()</code> と <code>visit_string()</code> の両方を実装することくらいだろうか。
+			</p>
+			<programlisting language="rust"><![CDATA[        impl<'de> serde::de::Visitor<'de> for StringVisitor {
+            type Value = MyString;]]></programlisting>
+			<p>
+					当然ではあるが、今回返したいのは <code>MyString</code> なので、 <code>Visitor</code> トレイトの関連型もそのように設定する。
+					<code>&amp;'de MyStr</code> のときと違って <code>'de</code> が表れないのはポイントで、作られる値が入力の lifetime に非依存ということである。
+					すなわち、デシリアライズ後に即座に入力が破棄されても作られた値はそれ以上長く存在できるという、所有権付きの型に当然の性質が表れている。
+			</p>
+			<programlisting language="rust"><![CDATA[            #[inline]
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Self::Value::from(v))
+            }
+
+            #[inline]
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Self::Value::from(v))
+            }]]></programlisting>
+			<p>
+				メソッドの中身については <link linkend="serde-support--deserialize--slice--infallible"><code>&amp;MyStr</code> の場合</link>と同様だが、今回定義するメソッドは <link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#method.visit_str"><code>visit_str</code></link> と <link xl:href="https://docs.rs/serde/1.0.118/serde/de/trait.Visitor.html#method.visit_string"><code>visit_string</code></link> である。
+				これらはいずれもデシリアライズ後すぐに入力が破棄されることを想定しており、デシリアライザが内部的に文字列デコードで <code>String</code> を使った場合は <code>visit_string()</code> が呼ばれ、 <code>&amp;str</code> で済んだ場合であれば <code>visit_str()</code> が呼ばれる。
+			</p>
+			<p>
+				デシリアライザが内部的に <code>String</code> を使うというのは、たとえばエスケープの解除などが考えられる。
+				<code>foo\"bar</code> のような入力を <code>foo"bar</code> として解釈しなければならない場合、入力である <code>foo\"bar</code> をそのまま <code>&amp;str</code> として <code>visit_str()</code> に渡されても困るわけである。
+				このように入力フォーマット特有の解釈や変換などの処理の過程で <code>String</code> を利用することがあり、 visitor が <code>visit_string()</code> を実装しているというのは「もしデシリアライザが所有権付きの文字列を持っていたら、所有権ごと渡してくれるとより効率的な処理ができます」という表明である。
+			</p>
+			<p>
+				<code>visit_string()</code> の実装は必須ではないが、実装しないことのメリットが皆無なので実装すべきである。
+				実装しなかった場合、デシリアライザが <code>String</code> を使っていても <code>visit_str()</code> に参照が渡される。
+				このとき <code>Self::Value::from()</code> つまり <code><![CDATA[<MyString as From<&str>>::from]]></code> は内部で動的にメモリを確保することになるので、デシリアライザが行った分と合わせて二度のアロケーションが発生しており非効率になってしまう。
+			</p>
+			<note>
+				<title>手抜き実装</title>
+
+				<p>
+					所有権付きの型は、追加の制約なしであれば一応 <link xl:href="https://serde.rs/container-attrs.html#transparent"><code>#[serde(transparent)]</code></link> のおかげで <code>derive(serde::Deserialize)</code> を使うことはできる。
+					しかしこの場合、デシリアライズ失敗時のエラーメッセージとして内部の型のものが使われるので、もしメッセージを変えたければ自分で実装すべきである。
+				</p>
+				<figure>
+					<programlisting language="rust"><![CDATA[/// My string.
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+pub struct MyString(String);]]></programlisting>
+					<caption>
+						追加の制約なしのスライス型で <code>derive(serde::Deserialize)</code> する。
+						この場合内部の型が <code>String</code> なので、エラー時には期待されていた値の説明として "a string" が使われる。
+						<code>MyString</code> の場合それでも良いのだが。
+					</caption>
+				</figure>
+				<p>
+					残念ながら追加の制約付きの型ではこのような手抜きはできないので、諦めて自前で実装するしかない。
+				</p>
+			</note>
+			<p>
+				追加の制約がある場合についても、所有権なしのスライス型を参考にいけるので、解説なしでコード例だけ載せておく。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for AsciiString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        /// Visitor for `AsciiString`.
+        struct StringVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for StringVisitor {
+            type Value = AsciiString;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("an ASCII string")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_string(StringVisitor)
+    }
+}]]></programlisting>
+				<caption>追加の制約なしのスライス型で文字列のみを受け付ける <code>Deserialize</code> 実装</caption>
+			</figure>
+			<figure>
+				<programlisting language="rust"><![CDATA[#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for AsciiByteBuf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        /// Visitor for `AsciiByteBuf`.
+        struct ByteBufVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ByteBufVisitor {
+            type Value = AsciiByteBuf;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("ASCII bytes")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+
+            #[inline]
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Self::Value::try_from(v).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_any(ByteBufVisitor)
+    }
+}]]></programlisting>
+				<caption>追加の制約なしのスライス型で文字列とバイト列を受け付ける <code>Deserialize</code> 実装</caption>
+			</figure>
+			<p>
+				見た目には単調で情報量の薄いコードに見えるが、それは様々な型 (たとえば <code>&amp;str</code>, <code>String</code>, <code>&amp;[u8]</code>, <code><![CDATA[Vec<u8>]]></code> など) に対して適切な <code>From</code> や <code>TryFrom</code> トレイトの実装を済ませてあるからであり、内部的に実行されるコードは少しずつ異なっている。
+			</p>
+		</section>
+	</section>
 </section>
 
 <section xml:id="references">
