@@ -1394,7 +1394,7 @@ impl AsciiByteBuf {
     }
 
     pub fn new<T: Into<Vec<u8>> + AsRef<[u8]>>(s: T) -> Result<Self, CreationError<T>> {
-        match AsciiStr::validate_bytes(s.as_ref()) {
+        match AsciiBytes::validate_bytes(s.as_ref()) {
             Ok(_) => Ok(unsafe {
                 // SAFETY: This is safe because the string is successfully validated.
                 Self::from_bytes_unchecked(s.into())
