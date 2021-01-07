@@ -1409,7 +1409,7 @@ impl AsciiByteBuf {
 				<caption>そっすね</caption>
 			</figure>
 			<p>
-				<code>new()</code> の引数となる型には、最終的に <code><![CDATA[Vec<u8>]]></code> にするための <code><![CDATA[Into<Vec<u8>>]]></code> と、検査で必要な <code>&amp;mut [u8]</code> を取り出すための <code><![CDATA[AsRef<[u8]>]]></code> の trait bound が必要である。
+				<code>new()</code> の引数となる型には、最終的に <code><![CDATA[Vec<u8>]]></code> にするための <code><![CDATA[Into<Vec<u8>>]]></code> と、検査で必要な <code>&amp;[u8]</code> を取り出すための <code><![CDATA[AsRef<[u8]>]]></code> の trait bound が必要である。
 			</p>
 		</section>
 
