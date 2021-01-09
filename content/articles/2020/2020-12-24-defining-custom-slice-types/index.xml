@@ -2018,7 +2018,7 @@ impl From<&MyStr> for Arc<MyStr> {
 					<programlisting language="rust"><![CDATA[use std::rc::Rc;
 use std::sync::Arc;
 
-impl From<MyString> for Box<MyStr> {
+impl From<MyString> for Rc<MyStr> {
     fn from(s: MyString) -> Self {
         // Create the shared inner slice.
         let inner_box: Rc<str> = Rc::from(s.0);
@@ -2049,7 +2049,7 @@ impl From<MyString> for Arc<MyStr> {
         }
     }
 }]]></programlisting>
-					<caption><code>MyString</code> からの <code><![CDATA[Box<MyStr>]]></code> の作成</caption>
+					<caption><code>MyString</code> からの <code><![CDATA[Rc<MyStr>]]></code> と <code><![CDATA[Arc<MyStr>]]></code> の作成</caption>
 				</figure>
 				<p>
 					<code>Rc</code> と <code>Arc</code> についても同様で、特に語るべきことはない。
@@ -2080,8 +2080,9 @@ impl From<MyString> for Arc<MyStr> {
     fn from(s: &'a MyStr) -> Self {
         Cow::Borrowed(s)
     }
+}
 
-impl From<MyString> for Cow<'_, MyString> {
+impl From<MyString> for Cow<'_, MyStr> {
     #[inline]
     fn from(s: MyString) -> Self {
         Cow::Owned(s)
