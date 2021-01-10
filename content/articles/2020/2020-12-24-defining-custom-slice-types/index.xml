@@ -2146,6 +2146,97 @@ impl From<MyString> for Cow<'_, MyStr> {
 		</p>
 	</section>
 
+	<section xml:id="implementing-traits--deref">
+		<title><code>Deref</code>, <code>DerefMut</code></title>
+
+		<p>
+				<code>Deref</code> と <code>DerefMut</code> はある型を透過的に別の型への参照として振る舞わせるもので、非常に便利である一方、 strong typedef の「内部的には同じ型を別個のものとして区別させる」という目的と反するものでもある。
+				標準ライブラリのドキュメントでは、これらのトレイトは<strong>スマートポインタのみに実装すべきである</strong>と強調されている。
+		</p>
+		<blockquote cite="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">
+			<p>
+				Implementing <code>Deref</code> for smart pointers makes accessing the data behind them convenient, which is why they implement <code>Deref</code>.
+				On the other hand, the rules regarding <code>Deref</code> and <code>DerefMut</code> were designed specifically to accommodate smart pointers.
+				Because of this, <strong><code>Deref</code> should only be implemented for smart pointers</strong> to avoid confusion.
+			</p>
+			<footer>
+				Rust 1.48.0 の <link xl:href="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">core::ops::Deref</link> のドキュメント。
+				強調は原文ママ
+			</footer>
+		</blockquote>
+		<p>
+			たとえば <code>str</code> は内部的には <code>[u8]</code> であるが、 <code><![CDATA[Deref<Target=[u8]> for str]]></code> は実装されていない。
+			このような「透過的に同一視されてほしいわけではない型」は <code><![CDATA[AsRef<[u8]>]]></code> だったり <code>.as_bytes()</code> で明示的な変換を行うべしということである。
+		</p>
+		<p>
+			一方で、 <code>&amp;String</code> が透過的に <code>&amp;str</code> として扱えてほしいとか <code><![CDATA[Vec<u8>]]></code> を透過的に <code>&amp;[u8]</code> として扱いたいとかは全くもって正当な要求である。
+			実際、標準ライブラリでも <code><![CDATA[Deref<Target=str> for String]]></code> とか <code><![CDATA[Deref<Target=[u8]> for Vec<u8>]]></code> などの実装がされている。
+			よって、所有権付きの独自型から所有権なしのスライス型への <code>Deref</code> による変換は一般的に実装すべきである。
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[impl core::ops::Deref for MyString {
+    type Target = MyStr;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_my_str()
+    }
+}
+
+impl core::ops::DerefMut for MyString {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_my_str_mut()
+    }
+}]]></programlisting>
+			<caption>
+				独自スライス型への暗黙の変換を許容する
+			</caption>
+		</figure>
+		<p>
+			追加の制約の有無に関係なく同じような実装になるため、 <code>AsciiString</code> と <code>AsciiByteBuf</code> への実装例は省略する。
+		</p>
+		<p>
+			一応例としてコードは載せるが、特に所有権のないスライス型に本当に <code>Deref</code> を実装すべきかは熟慮すべきである。
+			困ったら実装せずにおくのがよい。
+			後から std や core のトレイトを実装しても breaking change にはならないはずである。
+			<!-- TODO:
+				根拠として https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bounds の
+				"Deriving more traits from the standard library using the `derive` attribute is not a breaking change." を持ってこようかと思ったが、
+				core::ops::Deref は std のトレイトだが derive ではない……
+			-->
+		</p>
+		<figure>
+			<programlisting language="rust"><![CDATA[// Do you really want this?
+impl core::ops::Deref for MyStr {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+// Do you really REALLY want this?
+impl core::ops::DerefMut for MyStr {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}]]></programlisting>
+			<caption>
+				独自スライス型への <code>Deref</code> と <code>DerefMut</code> の実装
+			</caption>
+		</figure>
+		<p>
+			再三繰り返すが、追加の制約がある型の場合、くれぐれも内側の型 (<code>MyStr</code> の例であれば <code>str</code>) への mutable 参照を safe に露出させてはいけない。
+			たとえば <code>AsciiStr</code> から <code>DerefMut</code> 経由で <code>&amp;mut str</code> を露出させるのは厳禁である。
+		</p>
+		<p>
+			例のごとく、 <code>AsciiStr</code> と <code>AsciiBytes</code> への実装例は省略する。
+		</p>
+	</section>
+
 	<section xml:id="implementing-traits--as-ref">
 		<title><code>AsRef</code>, <code>AsMut</code></title>
 
@@ -2309,97 +2400,6 @@ impl AsRef<[u8]> for MyString {
 				くれぐれも<strong>制約が緩くなるような変換で mutable な参照を返さないこと</strong>。
 			</p>
 		</section>
-	</section>
-
-	<section xml:id="implementing-traits--deref">
-		<title><code>Deref</code>, <code>DerefMut</code></title>
-
-		<p>
-				<code>Deref</code> と <code>DerefMut</code> はある型を透過的に別の型への参照として振る舞わせるもので、非常に便利である一方、 strong typedef の「内部的には同じ型を別個のものとして区別させる」という目的と反するものでもある。
-				標準ライブラリのドキュメントでは、これらのトレイトは<strong>スマートポインタのみに実装すべきである</strong>と強調されている。
-		</p>
-		<blockquote cite="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">
-			<p>
-				Implementing <code>Deref</code> for smart pointers makes accessing the data behind them convenient, which is why they implement <code>Deref</code>.
-				On the other hand, the rules regarding <code>Deref</code> and <code>DerefMut</code> were designed specifically to accommodate smart pointers.
-				Because of this, <strong><code>Deref</code> should only be implemented for smart pointers</strong> to avoid confusion.
-			</p>
-			<footer>
-				Rust 1.48.0 の <link xl:href="https://doc.rust-lang.org/1.48.0/core/ops/trait.Deref.html">core::ops::Deref</link> のドキュメント。
-				強調は原文ママ
-			</footer>
-		</blockquote>
-		<p>
-			たとえば <code>str</code> は内部的には <code>[u8]</code> であるが、 <code><![CDATA[Deref<Target=[u8]> for str]]></code> は実装されていない。
-			このような「透過的に同一視されてほしいわけではない型」は <code><![CDATA[AsRef<[u8]>]]></code> だったり <code>.as_bytes()</code> で明示的な変換を行うべしということである。
-		</p>
-		<p>
-			一方で、 <code>&amp;String</code> が透過的に <code>&amp;str</code> として扱えてほしいとか <code><![CDATA[Vec<u8>]]></code> を透過的に <code>&amp;[u8]</code> として扱いたいとかは全くもって正当な要求である。
-			実際、標準ライブラリでも <code><![CDATA[Deref<Target=str> for String]]></code> とか <code><![CDATA[Deref<Target=[u8]> for Vec<u8>]]></code> などの実装がされている。
-			よって、所有権付きの独自型から所有権なしのスライス型への <code>Deref</code> による変換は一般的に実装すべきである。
-		</p>
-		<figure>
-			<programlisting language="rust"><![CDATA[impl core::ops::Deref for MyString {
-    type Target = MyStr;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.as_my_str()
-    }
-}
-
-impl core::ops::DerefMut for MyString {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_my_str_mut()
-    }
-}]]></programlisting>
-			<caption>
-				独自スライス型への暗黙の変換を許容する
-			</caption>
-		</figure>
-		<p>
-			追加の制約の有無に関係なく同じような実装になるため、 <code>AsciiString</code> と <code>AsciiByteBuf</code> への実装例は省略する。
-		</p>
-		<p>
-			一応例としてコードは載せるが、特に所有権のないスライス型に本当に <code>Deref</code> を実装すべきかは熟慮すべきである。
-			困ったら実装せずにおくのがよい。
-			後から std や core のトレイトを実装しても breaking change にはならないはずである。
-			<!-- TODO:
-				根拠として https://rust-lang.github.io/api-guidelines/future-proofing.html#data-structures-do-not-duplicate-derived-trait-bounds-c-struct-bounds の
-				"Deriving more traits from the standard library using the `derive` attribute is not a breaking change." を持ってこようかと思ったが、
-				core::ops::Deref は std のトレイトだが derive ではない……
-			-->
-		</p>
-		<figure>
-			<programlisting language="rust"><![CDATA[// Do you really want this?
-impl core::ops::Deref for MyStr {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-// Do you really REALLY want this?
-impl core::ops::DerefMut for MyStr {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}]]></programlisting>
-			<caption>
-				独自スライス型への <code>Deref</code> と <code>DerefMut</code> の実装
-			</caption>
-		</figure>
-		<p>
-			再三繰り返すが、追加の制約がある型の場合、くれぐれも内側の型 (<code>MyStr</code> の例であれば <code>str</code>) への mutable 参照を safe に露出させてはいけない。
-			たとえば <code>AsciiStr</code> から <code>DerefMut</code> 経由で <code>&amp;mut str</code> を露出させるのは厳禁である。
-		</p>
-		<p>
-			例のごとく、 <code>AsciiStr</code> と <code>AsciiBytes</code> への実装例は省略する。
-		</p>
 	</section>
 
 	<section xml:id="implementing-traits--fmt">
