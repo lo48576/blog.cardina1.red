@@ -22,6 +22,25 @@ excerpt: "Rust で str や Path のような独自のスライス型を定義す
 >
 <title>Rust (1.48.0) で独自のスライス型や文字列型を定義する</title>
 
+<important>
+	<title>本記事を元に、独立したオンラインの本として整理した</title>
+
+	<p>
+		本記事は2020年の Advent Calendar 用に書かれた記事であるが、ブログ記事として明らかに不適当な長さであった。
+		そこで、ページ分割や改稿のうえ、独立したオンラインの本として整理したものを公開した。
+		<strong>本記事の代わりに当該 book を参照せよ</strong>。
+	</p>
+	<p>
+		オンラインで読むには <uri><link xl:href="https://lo48576.gitlab.io/rust-custom-slice-book/">https://lo48576.gitlab.io/rust-custom-slice-book/</link></uri> を、
+		リポジトリは <uri><link xl:href="https://gitlab.com/lo48576/rust-custom-slice-book">https://gitlab.com/lo48576/rust-custom-slice-book</link></uri> を参照のこと。
+		クレートとしてまとめられたサンプルコードも同リポジトリにて公開している。
+	</p>
+	<p>
+		上記の本の公開をもって、<strong>以後本記事では重大で致命的な誤りを除いて更新を行わない</strong>こととする。
+		修正、改善、内容の追加のすべては上記の本に対して行うことになる。
+	</p>
+</important>
+
 <p>
 	Rust でプログラムを書くうえで、用途や制約に応じた適切な型の定義は大変重要である。
 	たとえば Rust ではバイト列は <code>[u8]</code>、 UTF-8 文字列は <code>str</code>、OS ネイティブのエンコーディングの文字列は <code>std::ffi::OsStr</code>、パス文字列は <code>std::path::Path</code> といったように、横着すればひとつの型で済むような様々なデータに対してそれぞれの特徴に応じた型を標準で用意している。
@@ -35,9 +54,7 @@ excerpt: "Rust で str や Path のような独自のスライス型を定義す
 	本記事では、独自のスライス型や関係する定義の方法や理由について、実際に動く例を挙げて詳細に解説する。
 </p>
 <p>
-	あまりに詳細すぎてコード例がクッソ長いため、あとでどこかに動く状態のコードを置いておくつもり。
 	なお、この記事は <link xl:href="https://creativecommons.org/licenses/by/4.0/deed.ja">CC-BY 4.0</link> ライセンスで、記事中のソースコードは (本記事の筆者以外によるプロジェクトからの引用を除いて) <link xl:href="https://creativecommons.org/publicdomain/zero/1.0/deed.ja">CC0 1.0</link> ライセンスで提供される。
-	<!-- TODO -->
 </p>
 <p>
 	この記事は <link xl:href="https://qiita.com/advent-calendar/2020/rust2">Rust 2 Advent Calendar 2020</link> の23日目<footnote xml:id="footnote-23rd-in-utc" refmark-id="footnote-ref-23rd-in-utc">
