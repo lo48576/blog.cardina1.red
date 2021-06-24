@@ -1,6 +1,7 @@
 ---
 created_at: 2019-12-16T16:27:41+09:00
 published_at: 2019-12-19T03:18:46+09:00
+updated_at: 2021-06-24T20:58:09+09:00
 format: article2019
 title: "Panic を恐れるべからず"
 tags:
@@ -1144,6 +1145,9 @@ impl Id {
 					<link xl:href="https://doc.rust-lang.org/1.39.0/book/ch09-03-to-panic-or-not-to-panic.html">To panic! or Not To panic! - The Rust Programming Language</link> (1.39.0)
 				</li>
 			</ul>
+		</li>
+		<li>
+			<link xl:href="https://togetter.com/li/1640435">Rust での unwrap, expect, panic, assert 周辺の話 - Togetter</link>
 		</li>
 	</ul>
 </section>
