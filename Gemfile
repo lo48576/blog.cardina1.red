@@ -8,6 +8,7 @@ group :nanoc do
   # Required for `nanoc live` command.
   gem 'nanoc-live'
   gem 'adsf'
+  gem 'webrick'
 end
 
 # Required by `relativize_paths` filter.
