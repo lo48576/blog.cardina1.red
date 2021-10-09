@@ -29,10 +29,10 @@ excerpt: "Rust 1.36 では、組込の複合代入演算子では発生せずユ
 </p>
 
 <note>
-	<title>Rust 1.39.0 で例外的な扱いは削除された</title>
+	<title>Rust 1.39.0 で例外的な許容は削除された</title>
 	<p>
-		<quote xml:lang="en"><qp>“</qp>this warning will become a hard error in the future<qp>”</qp></quote> と予告されていたように、 Rust 1.39.0 にて <link xl:href="https://github.com/rust-lang/rust/blob/1.40.0/RELEASES.md#compatibility-notes">一部ライフタイムエラーの例外的な扱いはなくなった</link>。
-		1.39.0 およびそれ以降の rustc では、この記事で警告とされているようなコードは素直にエラーとなる。
+		<quote xml:lang="en"><qp>“</qp>this warning will become a hard error in the future<qp>”</qp></quote> と予告されていたように、 Rust 1.39.0 にて <link xl:href="https://github.com/rust-lang/rust/blob/1.40.0/RELEASES.md#compatibility-notes">一部ライフタイムエラーの例外的な "soft error" 扱いはなくなった</link>。
+		1.39.0 およびそれ以降の rustc では、この記事で警告とされているようなコードは素直にコンパイルエラーとなる。
 	</p>
 </note>
 
