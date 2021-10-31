@@ -1,7 +1,7 @@
 ---
 created_at: 2019-12-16T16:27:41+09:00
 published_at: 2019-12-19T03:18:46+09:00
-updated_at: 2021-06-24T20:58:09+09:00
+updated_at: 2021-11-01T04:14:05+09:00
 format: article2019
 title: "Panic を恐れるべからず"
 tags:
@@ -524,7 +524,7 @@ struct SafeLinkedList<T> {
 impl<T: Clone> SafeLinkedList<T> {
     pub fn push_back(&self, val: T) -> NodeIndex {
         let new_index = NodeIndex(self.arena.len());
-        // 想定: push された要素のインデックスは new_index.i である。
+        // 想定: push された要素のインデックスは new_index.0 である。
         self.arena.push(Node {
             data: val,
             // 保証したい条件0: 最後尾ノードの next は None である。
