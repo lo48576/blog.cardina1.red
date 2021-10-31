@@ -30,19 +30,19 @@ GEM
     hamster (3.0.0)
       concurrent-ruby (~> 1.0)
     http_parser.rb (0.6.0)
-    json (2.5.1)
+    json (2.6.1)
     json_schema (0.21.0)
     lazy_priority_queue (0.1.1)
     listen (3.7.0)
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
     mini_portile2 (2.6.1)
-    nanoc (4.12.2)
+    nanoc (4.12.3)
       addressable (~> 2.5)
       colored (~> 1.2)
       nanoc-checking (~> 1.0)
-      nanoc-cli (= 4.12.2)
-      nanoc-core (= 4.12.2)
+      nanoc-cli (= 4.12.3)
+      nanoc-core (= 4.12.3)
       nanoc-deploying (~> 1.0)
       parallel (~> 1.12)
       tty-command (~> 0.8)
@@ -50,12 +50,12 @@ GEM
     nanoc-checking (1.0.1)
       nanoc-cli (~> 4.11, >= 4.11.15)
       nanoc-core (~> 4.11, >= 4.11.15)
-    nanoc-cli (4.12.2)
+    nanoc-cli (4.12.3)
       cri (~> 2.15)
       diff-lcs (~> 1.3)
-      nanoc-core (= 4.12.2)
+      nanoc-core (= 4.12.3)
       zeitwerk (~> 2.1)
-    nanoc-core (4.12.2)
+    nanoc-core (4.12.3)
       concurrent-ruby (~> 1.1)
       ddmemoize (~> 1.0)
       ddmetrics (~> 1.0)
@@ -84,7 +84,7 @@ GEM
       tty-color (~> 0.5)
     public_suffix (4.0.6)
     pygments.rb (2.2.0)
-    racc (1.5.2)
+    racc (1.6.0)
     rack (2.2.3)
     rack-livereload (0.3.17)
       rack
@@ -119,7 +119,7 @@ GEM
       nokogiri (~> 1.6)
       rexml (~> 3.2)
     webrick (1.7.0)
-    zeitwerk (2.4.2)
+    zeitwerk (2.5.1)
 
 PLATFORMS
   ruby
@@ -139,4 +139,4 @@ DEPENDENCIES
   webrick
 
 BUNDLED WITH
-   2.2.25
+   2.2.29
