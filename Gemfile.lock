@@ -21,15 +21,15 @@ GEM
     ddmetrics (1.0.1)
     ddplugin (1.0.3)
     diff-lcs (1.4.4)
-    em-websocket (0.5.2)
+    em-websocket (0.5.3)
       eventmachine (>= 0.12.9)
-      http_parser.rb (~> 0.6.0)
+      http_parser.rb (~> 0)
     eventmachine (1.2.7)
     ffi (1.15.4)
     generator (0.0.1)
     hamster (3.0.0)
       concurrent-ruby (~> 1.0)
-    http_parser.rb (0.6.0)
+    http_parser.rb (0.8.0)
     json (2.6.1)
     json_schema (0.21.0)
     lazy_priority_queue (0.1.1)
@@ -139,4 +139,4 @@ DEPENDENCIES
   webrick
 
 BUNDLED WITH
-   2.2.29
+   2.2.31
