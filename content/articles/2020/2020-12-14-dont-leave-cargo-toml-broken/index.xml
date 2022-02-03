@@ -1,6 +1,7 @@
 ---
 created_at: 2020-12-13T03:19:54+09:00
 published_at: 2020-12-14T00:07:13+09:00
+updated_at: 2022-02-03T23:25:15+09:00
 format: article2019
 title: "Cargo.toml を壊れたままにしない"
 tags:
@@ -503,6 +504,11 @@ before_script:
 					<p>
 						軽い気持ちで <code>foo = "1"</code> のような緩い指定をした結果壊れるようでは、ユーザが困ります。
 						<code>foo = "1.0.3"</code> のように、追加時点で使おうとしていたバージョンを明示しましょう。
+					</p>
+				</li>
+				<li>
+					<p>
+						参考: <link xl:href="https://users.rust-lang.org/t/psa-please-specify-precise-dependency-versions-in-cargo-toml/71277">PSA: Please specify precise dependency versions in Cargo.toml - announcements - The Rust Programming Language Forum</link>
 					</p>
 				</li>
 			</ul>
