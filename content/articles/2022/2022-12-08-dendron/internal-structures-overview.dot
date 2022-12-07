@@ -1,0 +1,110 @@
+///bin/true <<//
+/*
+//
+cd "$(dirname "$(readlink -f "$0")")"
+dot -Tsvg "$0" -o "$(basename "$0" .dot)".svg
+exit
+*/
+
+digraph "Internal structures" {
+	newrank = true;
+	node [
+		fontname = monospace,
+	];
+
+	treecore0 [label="TreeCore"];
+	tree0_0 [label="Tree"];
+	tree0_0 -> treecore0;
+	{ rank=same; tree0_0; }
+	{ rank=same; treecore0; }
+
+	subgraph cluster_node0 {
+		label="Node 0";
+		node0_nodecore [label="NodeCore"];
+		node0_membership [label="MembershipCore"];
+		node0_nodecore -> node0_membership [constraint=false];
+		{
+			rank = same;
+			node0_nodecore -> node0_membership [style=invis];
+		}
+	}
+	node0_membership -> treecore0 [constraint=false, style=dashed];
+
+	subgraph cluster_node0_0 {
+		label="Node 0.0";
+		node0_0_nodecore [label="NodeCore"];
+		node0_0_membership [label="MembershipCore"];
+		node0_0_nodecore -> node0_0_membership [constraint=false];
+		{
+			rank = same;
+			node0_0_nodecore;
+			node0_0_membership;
+		}
+	}
+	node0_0_membership -> treecore0 [constraint=false, style=dashed];
+
+	subgraph cluster_node0_1 {
+		label="Node 0.1";
+		node0_1_nodecore [label="NodeCore"];
+		node0_1_membership [label="MembershipCore"];
+		node0_1_nodecore -> node0_1_membership [constraint=false];
+		{
+			rank=same;
+			node0_1_nodecore;
+			node0_1_membership;
+		}
+	}
+	// `style=solid` since `node0_handle` has the reference to this node.
+	node0_1_membership -> treecore0 [constraint=false, style=solid];
+
+	subgraph cluster_node0_1_0 {
+		label="Node 0.1.0";
+		node0_1_0_nodecore [label="NodeCore"];
+		node0_1_0_membership [label="MembershipCore"];
+		node0_1_0_nodecore -> node0_1_0_membership [constraint=false];
+		{
+			rank = same;
+			node0_1_0_nodecore;
+			node0_1_0_membership;
+		}
+	}
+	node0_1_0_membership -> treecore0 [constraint=false, style=dashed];
+
+	subgraph cluster_node0_1_1 {
+		label="Node 0.1.1";
+		node0_1_1_nodecore [label="NodeCore"];
+		node0_1_1_membership [label="MembershipCore"];
+		node0_1_1_nodecore -> node0_1_1_membership [constraint=false];
+		{
+			rank=same;
+			node0_1_1_nodecore;
+			node0_1_1_membership;
+		}
+	}
+	node0_1_1_membership -> treecore0 [constraint=false, style=dashed];
+
+	treecore0 -> node0_nodecore;
+	node0_nodecore -> node0_0_nodecore;
+	node0_1_nodecore -> node0_1_0_nodecore;
+
+	node0_0_nodecore -> node0_1_nodecore [constraint=false];
+	node0_1_0_nodecore -> node0_1_1_nodecore [constraint=false];
+
+	node0_handle [label="Node"];
+	node0_handle -> node0_1_nodecore;
+	node0_handle -> node0_1_membership;
+
+	// Horizontal ordering.
+	{
+		rank=same;
+		node0_nodecore -> node0_membership [style=invis];
+	}
+	{
+		rank=same;
+		node0_0_nodecore -> node0_0_membership -> node0_1_nodecore -> node0_1_membership -> node0_handle [style=invis];
+	}
+	{
+		rank=same;
+		node0_1_0_nodecore -> node0_1_0_membership -> node0_1_1_nodecore -> node0_1_1_membership [style=invis];
+	}
+}

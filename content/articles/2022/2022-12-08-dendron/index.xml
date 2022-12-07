@@ -1,0 +1,815 @@
+---
+created_at: 2022-12-06T00:55:22+09:00
+published_at: 2022-12-08T07:54:46+09:00
+format: article2019
+title: "Rust 用に書いた木構造ライブラリ dendron の内部構造の解説"
+tags:
+  - advent-calendar
+  - prog-rust
+kind: article
+
+excerpt: "木構造、ほしくない？ 良いのがなければ作るしかない (白目)"
+---
+<?xml version="1.0"?>
+<article
+	xmlns="https://www.cardina1.red/_ns/doc2019"
+	xmlns:xl="http://www.w3.org/1999/xlink"
+	xml:id="article-2022-12-08-dendron"
+	xml:lang="ja"
+	version="0.1"
+>
+<title>Rust 用に書いた木構造ライブラリ dendron の内部構造の解説</title>
+
+<p>
+	木構造、ほしくない？
+</p>
+<p>
+	この記事は <link xl:href="https://qiita.com/advent-calendar/2022/rust">Rust Advent Calendar 2022</link> その2 の8日目の記事です。
+</p>
+
+<section xml:id="existing-implementations">
+	<title>既存実装</title>
+
+	<p>
+		木構造といったって、用途次第でいろいろ楽する方法があるわけです。
+		まずはよく知られた方法の実装について簡単に見てみましょう。
+	</p>
+	<p>
+		一気に作ってそれ以降は読み出すだけなら <code>Box</code> を使うのが楽です。
+	</p>
+<programlisting language="rust"><![CDATA[
+/// ノード。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    /// ノードに紐付いたデータ。
+    data: T,
+    /// 子ノード。
+    children: Vec<Box<Node<T>>>,
+}]]></programlisting>
+	<p>
+		ただし、このような持ち方だとノードの参照を保持しながら別の箇所を編集するといった用法はほぼ無理です。
+		参照を持ちながら編集もしたいなら、 Box の代わりに Rc と RefCell を使うのが鉄板です。
+	</p>
+<programlisting language="rust"><![CDATA[
+/// ノード。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    /// ノードに紐付いたデータ。
+    data: T,
+    /// 子ノード。
+    children: Vec<Rc<RefCell<Node<T>>>>,
+}]]></programlisting>
+	<p>
+		<time datetime="2022-12-06T05:41:26+09:00">2022年12月</time>時点で563kダウンロードを誇る <link xl:href="https://crates.io/crates/rctree">rctree</link> クレートはこのパターンです。
+		ただし、あるノードから近隣ノードの参照も取得できるよう、実際には Vec ではなく隣接ノードへの Rc / Weak 参照を持つようになっています。
+	</p>
+<programlisting language="rust"><![CDATA[
+use std::rc::{Rc, Weak};
+
+/// ノード。
+// rctree と書き方は多少異なるが、本質的には同じ。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    /// ノードに紐付いたデータ。
+    data: T,
+
+    /// 次の兄弟ノード。
+    // このノードが所有する。
+    next_sibling: Option<Rc<RefCell<Node<T>>>>,
+    /// 最初の子ノード。
+    // このノードが所有する。
+    first_child: Option<Rc<RefCell<Node<T>>>>,
+
+    /// 親ノード。
+    // 所有者は親の親なので、弱参照を持つ。
+    parent: Option<Weak<RefCell<Node<T>>>>,
+    /// 前の兄弟ノード。
+    // 所有者は前の前の兄弟ノードか親ノードなので、弱参照を持つ。
+    prev_sibling: Option<Weak<RefCell<Node<T>>>>,
+    /// 最後の子ノード。
+    // 所有者は最後の子の前の兄弟ノードか `first_child` フィールドなので、
+    //弱参照を持つ。
+    last_child: Option<Weak<RefCell<Node<T>>>>,
+}]]></programlisting>
+	<p>
+		あるいはマルチスレッドとかメモリアクセスの効率とか破棄のタイミング次第では、アリーナを使っても良いでしょう。
+		<time datetime="2022-12-06T05:49:20+09:00">2022年12月</time>時点で218kダウンロードを誇る <link xl:href="https://crates.io/crates/indextree">indextree</link> クレートはこのパターンです。
+	</p>
+<programlisting language="rust"><![CDATA[
+/// ノードの ID。
+///
+/// ユーザはノードを直接保持するのではなく、 ID を保持する。
+/// これにより木全体を長期間借用せずにノードを参照する手段を確保しておける。
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+struct NodeId(usize);
+
+/// 木。アリーナとも呼ばれる。
+#[derive(Default, Debug, Clone)]
+struct Tree<T> {
+    /// ノード。
+    ///
+    /// 削除されたら `None` を置く。
+    data: Vec<Option<Node<T>>>,
+}
+
+/// ノード。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    /// ノードに紐付いたデータ。
+    data: T,
+    /// 子ノードの ID。
+    children: Vec<NodeId>,
+}]]></programlisting>
+	<p>
+		例のごとく、 indextree でも近隣ノードへのアクセスを可能にするため子ノードのリストではなく隣接ノードを記憶するようになっています。
+	</p>
+<programlisting language="rust"><![CDATA[
+// indextree よりだいぶ単純化したが、本質部分は同じ。
+
+/// ノードの ID。
+///
+/// ユーザはノードを直接保持するのではなく、 ID を保持する。
+/// これにより木全体を長期間借用せずにノードを参照する手段を確保しておける。
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+struct NodeId(usize);
+
+/// 木。アリーナとも呼ばれる。
+#[derive(Default, Debug, Clone)]
+struct Arena<T> {
+    /// ノード。
+    ///
+    /// 削除されたら `None` を置く。
+    data: Vec<Option<Node<T>>>,
+}
+
+/// ノード。
+#[derive(Default, Debug, Clone)]
+struct Node<T> {
+    /// ノードに紐付いたデータ。
+    data: T,
+    /// 親ノード。
+    parent: Option<NodeId>,
+    /// 次の兄弟ノード。
+    next_sibling: Option<NodeId>,
+    /// 前の兄弟ノード。
+    prev_sibling: Option<NodeId>,
+    /// 最初の子ノード。
+    first_child: Option<NodeId>,
+    /// 最後の子ノード。
+    last_child: Option<NodeId>,
+}]]></programlisting>
+
+	<p>
+		この2種の実装のどちらかで事足りるなら、 rctree か indextree を使うのが現時点では鉄板の選択かと思います。
+		ところが、これでも木の扱いについては制約が多く、用途によっては不足があるのです。
+	</p>
+</section>
+
+<section xml:id="requirements">
+	<title>要件</title>
+
+	<section xml:id="sane-tree">
+		<title>まともな木</title>
+
+		<p>
+			木構造の典型的な用途として、たとえばマークアップ文書を HTML や XML の DOM のようなインターフェースで作成・編集・アクセスすることを想像してみてください。
+			いくらか欲しい性質があります。
+		</p>
+
+		<ul>
+			<li>
+				親、兄弟、子などの近隣ノードに容易にアクセスできる
+			</li>
+			<li>
+				任意のノードへの参照が木全体を生存させる
+			</li>
+			<li>
+				参照しているノードが勝手に破棄されない
+			</li>
+			<li>
+				部分木の分離や接合が簡単である
+			</li>
+			<li>
+				木は、親と兄弟を持たないルートノードをちょうど1つ持っている
+			</li>
+		</ul>
+
+		<p>
+			まず「<strong>親、兄弟、子などの近隣ノードに容易にアクセスできる</strong>」こと。
+			今見ているリスト項目の次の項目の中身を弄りたいなどの場合に、いちいち項目の順番 n を取得したうえで親ノード経由で n+1 番目の子にアクセスする必要があるのではあまりに面倒です。
+		</p>
+		<p>
+			そして「<strong>任意のノードへの参照が木全体を生存させる</strong>」こと。
+			リスト項目を覚えておいたのに、親であるリスト全体がいつの間にか解放されて項目1つしか残らなかった、では困ります。
+			たとえユーザがリスト項目ひとつだけを持っていたとしても、兄弟のリスト項目や文書全体が残っていないと、周辺の文脈や遠いところにあるかもしれないメタデータにアクセスできなくなってしまいます。
+			そのため、深いところにあるノードをあちこちで持ち回っても、木全体が生存し続けてほしいわけです。
+		</p>
+		<p>
+			さらに「<strong>参照しているノードが勝手に破棄されない</strong>」こと。
+			当たり前に聞こえるでしょうが、アリーナ方式ではこの保証は与えられません。
+			ノード ID は所詮は木の寿命や借用関係とは独立して存在するデータに過ぎないので、ノード ID を持っているからといって木やノードが破棄されるのを防ぐことはできません。
+		</p>
+		<p>
+			加えて「<strong>部分木の分離や接合が簡単である</strong>」こと。
+			部分木を元の木から新たな独立した木として切り離したり、別の場所で作っておいた木を別の木の下にまとめて接合する、といったことができると便利です。
+			アリーナ型だとノードのデータがアリーナを跨ぐ必要があるため一手間かかるのは容易に想像できるでしょう。
+			Rc ベースの実装であっても、適切な手順を踏まないと木を越えたノードの移動はうまくいかないことがありえます。
+		</p>
+		<p>
+			それから「<strong>木は、親と兄弟を持たないルートノードをちょうど1つ持っている</strong>」こと。
+			というか、木の定義とはそもそもそういうものです。
+			一番上位にあるノードが兄弟を持っていたら、それはもはや木ではないわけですね。
+			とはいえ通常そのような場合、それら兄弟をまとめて子として持つような仮想的なルートノードを考えてやれば普通の木として捉えられるので、理論上はそこまで深刻な問題ではありません。実践上は……型を付けるのが面倒になるので地味に厄介な問題です。
+		</p>
+		<p>
+			単純な Rc による木やアリーナによる木では、実はこれらの要件すべてを満たすことはできません。
+		</p>
+	</section>
+
+	<section xml:id="bad-properties-of-existing-implementations">
+		<title>既存実装の良くない性質</title>
+
+		<p>
+			<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/88bc932a031bf8e9b7484c1864e1b0eafb6fd242/docs/comparison.md">dendron のドキュメント</link>の焼き直しになりますが、前節で紹介した性質について既存実装がどうなっているか調べると、あまり喜ばしい状況ではないことがわかります。
+		</p>
+		<table>
+			<thead>
+				<tr>
+					<th>性質</th>
+					<th>rctree</th>
+					<th>indextree</th>
+					<th>dendron (自作ライブラリ)</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<th>親、兄弟、子などの近隣ノードに容易にアクセスできる</th>
+					<td>○</td>
+					<td>○</td>
+					<td>○</td>
+				</tr>
+				<tr>
+					<th>任意のノードへの参照が木全体を生存させる</th>
+					<td>×</td>
+					<td>×</td>
+					<td>○</td>
+				</tr>
+				<tr>
+					<th>参照しているノードが勝手に破棄されない</th>
+					<td>○</td>
+					<td>×</td>
+					<td>○</td>
+				</tr>
+				<tr>
+					<th>部分木の分離や接合が簡単である</th>
+					<td>△</td>
+					<td>×</td>
+					<td>○</td>
+				</tr>
+				<tr>
+					<th>ルートノードのある「ちゃんとした木」であることが保証される</th>
+					<td>×</td>
+					<td>×</td>
+					<td>○</td>
+				</tr>
+			</tbody>
+		</table>
+		<p>
+			まず「任意のノードへの参照が木全体を生存させる」性質は rctree も indextree も持ち合わせていません。
+			rctree は先祖への参照がなくなったら容赦なく先祖側を破棄してしまいます。
+			indextree ではノード ID はアリーナやノードを延命させないため、ノードやアリーナ自体が削除されることは阻止できません。
+			(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/88bc932a031bf8e9b7484c1864e1b0eafb6fd242/docs/comparison.md#reference-to-any-node-preserves-entire-tree">参考</link>)
+		</p>
+		<p>
+			「参照しているノードが勝手に破棄されない」性質は rctree は持っています (Rc なので当然といえば当然です) が、 indextree は持っていません。ノード ID の存在はアリーナやノードに対して制約を与えません。
+			(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/88bc932a031bf8e9b7484c1864e1b0eafb6fd242/docs/comparison.md#no-invalid-node-reference-can-possible-for-strong-reference">参考</link>)
+		</p>
+		<p>
+			「部分木の分離や接合が簡単である」という性質は rctree も indextree も持っていません。
+			indextree では同じアリーナ内であれば楽をできますが、別アリーナに移動する場合は自分で走査しながら木を作り直す必要があります。
+			rctree ではノードを <link xl:href="https://docs.rs/rctree/0.5.0/rctree/struct.Node.html#method.detach"><code>detach</code></link> することで別の木に接合できるようになりますが、<link xl:href="https://github.com/RazrFalcon/rctree/issues/11#issuecomment-525704448">detach や deep copy を忘れると木構造は意図せぬ状態になって壊れる</link>ことがあります。
+			つまり「操作自体は簡単だが、誤りやすく検査もない」という状態です。
+		</p>
+		<p>
+			「ルートノードのある『ちゃんとした木』であることが保証される」という性質も、実は rctree も indextree も備えていません。
+			どちらのクレートも、 safe な操作によって最上位ノードが兄弟を持つような状態に仕立て上げることができます。
+			つまり「本当の木」であることを前提としたアルゴリズムやプログラムが誤動作してしまうような状態がありうるということです。
+			(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/88bc932a031bf8e9b7484c1864e1b0eafb6fd242/docs/comparison.md#root-node-does-not-have-siblings">参考</link>)
+		</p>
+	</section>
+</section>
+
+<section xml:id="introducing-dendron">
+	<title>dendron の紹介</title>
+
+	<p>
+		欲しいものがなければ作るしかない、ということで作りました。
+	</p>
+	<ul>
+		<li>
+			<link xl:href="https://crates.io/crates/dendron">crates.io</link>
+		</li>
+		<li>
+			<link xl:href="https://docs.rs/indextree/latest/indextree/">rustdoc (docs.rs)</link>
+		</li>
+		<li>
+			<link xl:href="https://gitlab.com/nop_thread/dendron">リポジトリ (gitlab.com)</link>
+		</li>
+	</ul>
+
+	<p>
+		dendron は以下の性質を持つように作られました。
+	</p>
+
+	<ul>
+		<li>
+			親、兄弟、子などの近隣ノードに容易にアクセスできる (既出)
+		</li>
+		<li>
+			任意のノードへの参照が木全体を生存させる (既出)
+		</li>
+		<li>
+			参照しているノードが勝手に破棄されない (既出)
+		</li>
+		<li>
+			部分木の分離や接合が簡単である (既出)
+		</li>
+		<li>
+			木は、親と兄弟を持たないルートノードをちょうど1つ持っている (既出)
+		</li>
+		<li>
+			木構造の一時凍結ができる
+		</li>
+		<li>
+			ノードだけでなく「木そのもの」への参照を持てる
+		</li>
+		<li>
+			メソッド名が慣習を踏まえずとも明確である
+		</li>
+	</ul>
+	<p>
+		既出のものについては先に説明したとおりなので良いでしょう。
+		加えて言うなら、部分木の分離や接合については、木を跨ぐ操作もシームレスにできるようにしています。
+		「別の木に接合する前にデタッチを忘れないように」とか「同じノードが複数の木で共有されないようにしなければ」といった注意は不要です。
+		型システムと API によって自然に強制されます。
+	</p>
+	<p>
+		「木構造の一時凍結ができる」というのは、機能というよりは保証の話です。
+		たとえば「リストの項目を順番に処理するつもりでいろいろな関数に渡していたら、注目していたリスト項目がいつのまにか別のリスト内へと移動されていた」のような事故があると、正しくリストを走査できず悲しみを味わうことになります。
+		C++ 経験者であれば、意図せずイテレータを invalidate してしまっていたときのがっかり感を思い出すかもしれません。
+		木全体がその構造を変化させないことを型システムによって保証できれば、ユーザはバグや検査漏れに怯えることなくノードを扱えるようになります。
+	</p>
+	<p>
+		「ノードだけでなく『木そのもの』への参照を持てる」というのはそのままの意味で、ルートノードが別のノードになった場合でも同じ木全体を参照し続けられるということです。
+		ノードしか扱えないようなライブラリでは、「これがルートノードである」とユーザが決めたうえでそのノードを保持することで擬似的に木を保持していると見做します。
+		しかしそのノードに親ノードを追加することを考えたとき、追加した当事者は新しいルートノードを保持しなおすことができますが、他の箇所のコードでは旧ルートノードしか持っていないかもしれません。
+		さらに運が悪ければ、旧ルートノードが木から分離 (デタッチ) されて別の木になった場合、本来の意図とは違う木を参照する状態になってしまうことさえありえます。
+	</p>
+	<p>
+		「メソッド名が慣習を踏まえずとも明確である」というのは、 DOM (Document Object Model) のようなわかりづらい命名をしないということです。
+		たとえば <code>A.insertBefore(B, C);</code> というコードについて考えてみましょう。これは何を意味しているのでしょうか？
+		A, B, C の3つのノードが登場しますが、誰が、どこに、何を、挿入するのでしょうか。
+	</p>
+	<ul>
+		<li>A が、 B の前に、 C を？</li>
+		<li>A が、 C の前に、 B を？</li>
+		<li>C が、 B の前に、 A を？</li>
+		<li>C が、 A の前に、 B を？</li>
+	</ul>
+	<p>
+		正解は「A を親として、 C の前に、 B を挿入」です。
+		すなわち <code>parent.insertBefore(new, reference);</code> (parent を親として、 new を、 reference の前に) となっています。
+		非自明ですね。
+	</p>
+	<p>
+		そもそも「誰が」とか「誰を親として」の部分は本当に必要なのでしょうか。
+		「X を Y の前に挿入する」の2つのノード指定だけで十分だと思いませんか？
+		親ノードを与えさせることでルートノードの兄弟作成を阻止するという意図は考えられるかもしれませんが、どうせ親として渡されたノードが無関係だったらエラーにするのですから、最初から「ルートノードに兄弟を作ろうとしたらエラー」としても十分なはずです。
+	</p>
+	<p>
+		このように、 DOM はよく知られた API ではあるものの、非英語ネイティブとしてはその命名に非常に納得のいかないものがあり、また型の面でもデザインが最善であるとは思えません。
+		内部構造だけでなくインターフェースについても、ライブラリは必然性があり曖昧さの排除されたものを提供すべきです。
+		dendron では、このようなコードを <code>new.detach_insert_subtree(InsertAs::PreviousSiblingOf(reference));</code> と書きます。
+		字面は多少長いですが、「new を、reference の前の兄弟として、元の位置から分離 (detach) したうえで部分木ごと挿入する」というのが一目瞭然です。
+		曖昧さも誤解の余地もありません。
+	</p>
+</section>
+
+<section xml:id="implementation-details">
+	<title>実装の詳細</title>
+
+	<section xml:id="impl-details-abstract">
+		<title>概要</title>
+
+		<p>
+			大雑把には、 dendron は以下のようにしてデータを保持します。
+		</p>
+		<ul>
+			<li>
+				木もノードも、内部的なオブジェクト (<code>TreeCore</code>, <code>NodeCore</code>) と、ユーザが外部から参照するためのスマートポインタ型 (<code>Tree</code>, <code>Node</code>) で別々に用意されている。
+			</li>
+			<li>
+				木 (<code>TreeCore</code>) がルートノード (<code>NodeCore</code>)を所有し、各ノード (<code>NodeCore</code>)は最初の子と次の兄弟 (いずれも <code>NodeCore</code>) を所有する。
+			</li>
+			<li>
+				木のユーザ用スマートポインタ (<code>Tree</code>) は、木の内部オブジェクト (<code>TreeCore</code>) を所有する。
+			</li>
+			<li>
+					ノードのユーザ用スマートポインタ (<code>Node</code>) は、ノードの内部オブジェクト (<code>NodeCore</code>) を所有し、また、ノードの内部オブジェクト (<code>MembershipCore</code>) に対して木の生存を強制させる。
+			</li>
+		</ul>
+
+		<figure>
+			<img src="internal-structures-ownership-flow.svg" alt="" />
+			<caption>
+				所有権の流れ。
+				ユーザが持つ <code>Tree</code> または <code>Node</code> から所有関係が伝播し、最終的にどのノードや木への参照であろうと木全体が所有される状態になることがわかる。
+			</caption>
+		</figure>
+
+		<p>
+			端的には「ユーザの意志でしか作成されない特殊なスマートポインタを基点として、それらから辿れるオブジェクトは生存させる」という発想です。
+			参照カウント方式をベースに、循環参照まわりの問題を解決することで実現しました。
+		</p>
+	</section>
+
+	<section xml:id="dendron-components">
+		<title>構成要素</title>
+
+		<img src="internal-structures-overview.svg" alt="" />
+
+		<p>
+			ノードへのアクセスは <code>Node&lt;T&gt;</code> 型から、木へのアクセスは <code>Tree&lt;T&gt;</code> 型から提供されています。
+			この図のなかでユーザに露出されている型はこの2つだけです。
+		</p>
+
+		<section xml:id="components-nodecore-hierarchy">
+			<title><code>NodeCore</code></title>
+
+			<p>
+				ノードに紐付いたデータと近隣ノードへのリンクを保持するのが <code>NodeCore</code> 型です。
+				すなわち、 <code>NodeCore</code> 型は木構造データそのものを単純に表現しています。
+			</p>
+
+			<img src="internal-structures-overview-nodecore.svg" alt="" />
+
+			<p>
+				本当は近隣ノードへのリンクとして次の兄弟、<link xl:href="https://www.aosabook.org/en/posa/parsing-xml-at-the-speed-of-light.html#data-structures-for-the-document-object-model">前の兄弟 (循環)</link>、最初の子、親の4つを持っていますが、図では単純化のためノードが参照先の所有権を持つ (すなわち参照先の生存を担保する) ようなリンク、すなわち最初の子と次の兄弟についてのみ図示しています。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[
+/// Internal node data.
+// ↓図で強調したノード
+struct NodeCore<T> {
+    /// Data associated to the node.
+    data: RefCell<T>,
+    /// Neighbors.
+    // ↓図では NodeCore に含めて (まとめて) 表現している
+    neighbors: RefCell<Neighbors<T>>,
+    /// Membership to a tree.
+    // membership については、また後で。
+    membership: WeakMembership<T>,
+    /// The number of children.
+    num_children: Cell<usize>,
+}
+
+/// A collection of links to neighbor nodes.
+struct Neighbors<T> {
+    /// Parent.
+    // ↓図では省略
+    parent: IntraTreeLinkWeak<T>,
+    /// First child.
+    // ↓図で強調したエッジ
+    first_child: Option<IntraTreeLink<T>>,
+    /// Next sibling.
+    // ↓図で強調したエッジ
+    next_sibling: Option<IntraTreeLink<T>>,
+    /// Previous sibling.
+    // ↓図では省略
+    prev_sibling_cyclic: IntraTreeLinkWeak<T>,
+}
+
+/// An intra-tree owning reference to a node.
+pub(crate) struct IntraTreeLink<T> {
+    /// Target node core.
+    core: Rc<NodeCore<T>>,
+}
+]]></programlisting>
+				<caption>
+					dendron v0.1.5 における <code>NodeCore</code> 型の定義 (解説用にコメントを一部改変)
+					(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/node/internal.rs#L13-47"><code>NodeCore</code>, <code>Neighbors</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/node/internal.rs#L92-96"><code>IntraTreeLink</code></link>)
+				</caption>
+			</figure>
+			<p>
+				<code>NodeCore</code> にだけ着目して観察すれば、これが本質的には Rc ベースの木構造であることは簡単に納得してもらえることでしょう。
+				dendron における木に都合の良い性質を与えている重要な要素は、 <code>NodeCore</code> 以外の部分です。
+			</p>
+		</section>
+
+		<section xml:id="components-treecore-and-tree">
+			<title><code>TreeCore</code>, <code>Tree</code></title>
+
+			<p>
+				利便性と必要性の両面から、「木」そのものを表現する型 <code>TreeCore</code> と <code>Tree</code> が用意されています。
+			</p>
+
+			<img src="internal-structures-overview-treecore.svg" alt="" />
+
+			<p>
+				<code>TreeCore</code> 型は、個々のノードではなく木全体が持つべき情報を保持する内部的な型で、1つの木につきちょうど1つ存在します。
+				今のところはルートノードへの参照とロックマネージャくらいしか持っていませんが、たとえば「木の名前」のようなものも持たせるような変更も簡単にできます<footnote xml:id="footnote-tree-name-plan" refmark-id="footnote-ref-tree-name-plan">
+					すぐに必要というわけではないので保留にしてありますが、設計段階ではそのような変更を入れることを想定していましたし、そのうち入れるかもしれません。
+				</footnote>。
+			</p>
+			<p>
+				<code>Tree</code> 型は、 <code>TreeCore</code> を共有するような型で、ユーザ向けに露出されています。
+				<code>TreeCore</code> は木につき1つだけ存在しますが、 <code>Tree</code> は1つの木 (1つの <code>TreeCore</code>) に対して複数存在できます。
+			</p>
+			<p>
+				<code>TreeCore</code> 型は所有権つきでルートノードへの参照を持っています。
+				つまり <code>TreeCore</code> の所有権を持つことで、間接的・連鎖的にルートノードの子孫すべての <code>NodeCore</code> (そしてそれらが所有する <code>MembershipCore</code>) の生存も保証されることになります。
+				このことが、後で説明する、任意のノードへの参照が木全体を生存させる機構に利用されています。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[
+/// A core data of a tree.
+///
+/// This also represents an ownership of a tree. Every tree has just one
+/// corresponding `TreeCore`.
+///
+/// A value of this type is shared among nodes in the tree, so this will be
+/// referred as `Rc<RefCell<TreeCore<T>>>` or `Weak<RefCell<TreeCore<T>>>`.
+pub(crate) struct TreeCore<T> {
+    /// Root node.
+    root: RefCell<IntraTreeLink<T>>,
+    /// Hierarchy lock manager.
+    lock_manager: HierarchyLockManager,
+}
+
+/// A reference to the tree, with shared ownership.
+pub struct Tree<T> {
+    /// A reference to the tree core.
+    core: Rc<TreeCore<T>>,
+}
+]]></programlisting>
+				<caption>
+					dendron v0.1.5 における <code>TreeCore</code> 型の定義 (解説用にコメントを一部改変)
+					(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/tree.rs#L23-35"><code>TreeCore</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/tree.rs#L128-139"><code>Tree</code></link>)
+				</caption>
+			</figure>
+		</section>
+
+		<section xml:id="components-membership">
+			<title><code>MembershipCore</code></title>
+
+			<p>
+				<code>MembershipCore</code> まわりには、 dendron で最も重要なアイデアが実装されています。
+			</p>
+
+			<img src="internal-structures-overview-membership.svg" alt="" />
+
+			<p>
+				<code>MembershipCore</code> 型は、ノードが自身の属する木を知るための、また必要に応じて木の生存を担保するための型です。
+					この図において、点線は弱参照 (<code>std::rc::Weak</code> のような、参照先の生存を保証しない参照)、実線は強参照 (<code>std::rc::Rc</code> のような、参照先の生存を保証する参照) です。
+					ただしこの強弱の参照の区別は、 Rc / Weak の機構だけでなく、自前の参照カウント機構も加えた二段階の管理によって実現しています。
+			</p>
+			<p>
+				<code>MembershipCore</code> から <code>TreeCore</code> への参照が強参照 (実線) になっている箇所と弱参照 (点線) になっている部分があることに注目してください。
+				この参照は、後で解説する <code>Node</code> 型から参照されているときにだけ強参照になるようコントロールされています。
+				こうすることで、「木のノードがひとつでも <code>Node</code> 型としてユーザから参照されていれば、 (間接的に <code>TreeCore</code> の所有権も共有されるため) 木全体が生存し続ける」という状況を作ることができます。
+			</p>
+			<figure>
+				<programlisting language="rust"><![CDATA[
+/// A membership of a node to a tree.
+///
+/// Note that nodes may change its affiliation to another tree. In this case,
+/// membership should also be changed for all `Node` objects referring to the
+/// node, so this will be usually shared as `Rc<RefCell<<T>>>`.
+enum MembershipCore<T> {
+    /// Non-owning reference to the tree core.
+    ///
+    /// If there are no `Node<T>`s for the node, the membership will stay in
+    /// this state.
+    // ↓`Node<T>` がないときには弱参照を持っておく
+    Weak {
+        /// A weak reference to the tree core.
+        tree_core: Weak<TreeCore<T>>,
+    },
+    /// Shared owning reference to the tree core, and strong refcounts.
+    ///
+    /// If there are any `Node<T>`s for the node, the membership will stay in
+    /// this state.
+    // ↓`Node<T>` がある間は強参照を持つ
+    Strong {
+        /// A strong reference to the tree core.
+        tree_core: Rc<TreeCore<T>>,
+        /// Strong reference count for the tree core from this membership.
+        tree_refcount: NonZeroUsize,
+        /// Lock aggregator.
+        lock_aggregator: LockAggregatorForNode,
+    },
+}
+
+/// A reference to the membership of a node, with strong ownership of a tree.
+#[derive(Debug)]
+pub(crate) struct Membership<T> {
+    /// Target membership core.
+    inner: Rc<RefCell<MembershipCore<T>>>,
+}
+
+/// A reference to the membership of a node, without ownership of a tree.
+#[derive(Debug)]
+pub(crate) struct WeakMembership<T> {
+    /// Target membership core.
+    inner: Rc<RefCell<MembershipCore<T>>>,
+}
+]]></programlisting>
+				<caption>
+					dendron v0.1.5 における <code>Membership</code> 型関係の定義 (解説用にコメントを一部改変)
+					(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/membership.rs#L13-39"><code>MembershipCore</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/membership.rs#L58-63"><code>Membership</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/membership.rs#L259-266"><code>WeakMembership</code></link>)
+				</caption>
+			</figure>
+			<p>
+				<code>Membership</code> と <code>WeakMembership</code> はフィールドだけ見ると同じですが、値の作成であったり <code>Clone</code> や <code>Drop</code> トレイトの実装であったりなどの関数実装で差があります。
+				<code>Membership</code> は「木が必ず生存していて <code>Rc&lt;TreeCore&lt;T&gt;&gt;</code> を必ず取得できる」という状況でのみ存在でき、作成や破棄で参照カウント (<code>tree_refcount</code>) の増減を引き起こします。
+				一方 <code>WeakMembership</code> は木が今もまだ存在しているということを強制も保証もしません。
+			</p>
+			<p>
+				また、 <code>NodeCore</code> から <code>MembershipCore</code> への参照も、意図せぬ循環参照を防ぐため <code>WeakMembership</code> で保持されています。
+				木を生存させるか決めるのはあくまで <code>Node</code> 型を扱うユーザなのであって、ユーザから参照されていないノードは木に生かされる立場ではあっても木を生かす立場ではないのです。
+			</p>
+			<p>
+				<code>Node</code> が木 (<code>TreeCore</code>) への参照を直接持たないのは、ノードが木から分離されたときに備えてです。
+				たとえば <code>node0: Node&lt;i32&gt;</code> と <code>node1: Node&lt;i32&gt;</code> が <code>node_i: NodeCore&lt;i32&gt;</code> と <code>tree_i0: TreeCore&lt;i32&gt;</code> を直接に参照していたとしましょう。
+				ユーザが <code>node0</code> 経由で <code>node_i</code> を別の木 <code>tree_i1: TreeCore&lt;i32&gt;</code> に移動した場合を考えると、 <code>node1</code> は <code>node_i</code> が所属する木が変わったことに気付かないまま <code>tree_i0</code> への参照を持ち続けてしまうことになり、不整合状態になってしまいます。
+				このような木とノードのミスマッチを防ぐため、必ず対象のノードの情報を経由して木へアクセスするようにしているのです。
+			</p>
+		</section>
+
+		<section xml:id="components-node-handle">
+			<title><code>Node</code></title>
+
+			<p>
+				<code>Node</code> 型は、ノードやその属する木を強制的に生かす仕組みを持ったスマートポインタです。
+			</p>
+
+			<img src="internal-structures-overview-node-handle.svg" alt="" />
+
+			<figure>
+				<programlisting language="rust"><![CDATA[
+/// A shared owning reference to a node.
+pub struct Node<T> {
+    /// Target node core.
+    intra_link: IntraTreeLink<T>,
+    /// Membership of a node with ownership of the tree.
+    membership: Membership<T>,
+}
+
+/// A [`Node`] with a tree hierarchy edit prohibition bundled.
+pub struct FrozenNode<T> {
+    /// Target node core.
+    intra_link: IntraTreeLink<T>,
+    /// Membership of a node with ownership of the tree.
+    membership: MembershipWithEditProhibition<T>,
+}
+
+/// A [`Node`] with a tree hierarchy edit grant bundled.
+pub struct HotNode<T> {
+    /// Target node core.
+    intra_link: IntraTreeLink<T>,
+    /// Membership of a node with ownership of the tree.
+    membership: MembershipWithEditGrant<T>,
+}
+]]></programlisting>
+				<caption>
+					dendron v0.1.5 における <code>Node</code> 型関係の定義 (解説用にコードを一部改変)
+					(<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/node/plain.rs#L21-27"><code>Node</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/node/frozen.rs#L16-30"><code>FrozenNode</code></link>,
+					<link xl:href="https://gitlab.com/nop_thread/dendron/-/blob/v0.1.4/src/node/hot.rs#L16-30"><code>HotNode</code></link>)
+				</caption>
+			</figure>
+			<p>
+				<code>Node</code> 型は一番プレーンなもので、木構造の編集を許可も拒否もしません。
+				<code>FrozenNode</code> 型は、作成の際に木に対して木構造の編集を拒絶するようなロックをかけ、また破棄される際にロックを解放します。
+				<code>HotNode</code> 型は逆に、作成の際に木に対して木構造の編集を許可する (正確には「木構造の編集の拒絶を拒絶する」) ようなロックをかけ、また破棄される際にロックを解放します。
+			</p>
+			<p>
+				<code>Node</code> は <code>IntraTreeLink</code> を持っているのに <code>Membership</code> まで持っているのは無駄に思われるかもしれません。
+				実際これは何が何でも必要というわけではなく、単に実装で誤りづらくするための選択です。
+				真面目に書けば <code>NodeCore</code> と <code>Membership</code> は分離されている必要すらないはずですが (何故なら常に一対一対応するものだからです)、そのような実装にするとすべての関数で「この瞬間にノードや関数は破棄された後である可能性があるか」のようなことに気を配る必要があり、エンバグのリスクが高くなります。
+				そのため、初期の実装ではオーバーヘッドがあっても型システムによる保証を与えるようにして、まともに動作する段階まで持っていく方を優先しました。
+				ただし現状では問題なく動いていそうなので、将来的にはこの辺りはもっと効率化するかもしれません。
+			</p>
+		</section>
+	</section>
+</section>
+
+<section xml:id="conclusion">
+	<title>まとめ</title>
+
+	<p>
+		大雑把で説明しなかった部分も多くありましたが、ひとまず根本的な原理の部分は解説しました。
+		一度思い付いてしまえば単純なもので、何故いままで誰も実装していなかったのか不思議なくらいです<footnote xml:id="footnote-i-dont-like-existing-impls" refmark-id="footnote-ref-i-dont-like-existing-impls">
+			というか、既存ライブラリのビミョーな点の数々は世間に許容されているのか……！？
+		</footnote>。
+	</p>
+	<p>
+		dendron を実装することで、以下のような良い性質を持つ木構造ライブラリが手に入りました。
+	</p>
+
+	<ul>
+		<li>
+			親、兄弟、子などの近隣ノードに容易にアクセスできる
+			<ul>
+				<li>
+					<link xl:href="#components-nodecore-hierarchy">近隣ノードへの参照を持って</link>います。
+				</li>
+			</ul>
+		</li>
+		<li>
+			任意のノードへの参照が木全体を生存させる
+			<ul>
+				<li>
+					<link xl:href="#components-membership">ノードへの参照が自動的に木全体の所有権も確保</link>し、生存を確約します。
+				</li>
+			</ul>
+		</li>
+		<li>
+			参照しているノードが勝手に破棄されない
+			<ul>
+				<li>
+					<link xl:href="#components-node-handle">ノードへの参照が参照カウント方式になっている</link>ため、勝手に破棄されません。
+				</li>
+			</ul>
+		</li>
+		<li>
+			部分木の分離や接合が簡単である
+			<ul>
+				<li>
+					<link xl:href="#components-membership">個々のノードが自分の属する木を追跡している</link>ため、木からの分離や接合に対しても適切に反応できます。
+					また、分離 (detach) 忘れなどに絡む問題が起きづらいような API を提供しています。
+				</li>
+			</ul>
+		</li>
+		<li>
+			木は、親と兄弟を持たないルートノードをちょうど1つ持っている
+			<ul>
+				<li>
+					API 設計によって保証しています。
+				</li>
+			</ul>
+		</li>
+		<li>
+			木構造の一時凍結ができる
+			<ul>
+				<li>
+					<link xl:href="#components-node-handle">ノードから木に対して構造のロックを要請する機構がある</link>ため、一時凍結ができます。
+					また、凍結の一時禁止もできます。
+				</li>
+			</ul>
+		</li>
+		<li>
+			ノードだけでなく「木そのもの」への参照を持てる
+			<ul>
+				<li>
+					<link xl:href="#components-treecore-and-tree">ノードではなく木自体を表現する型を提供</link>しています。
+				</li>
+			</ul>
+		</li>
+		<li>
+			メソッド名が慣習を踏まえずとも明確である
+			<ul>
+				<li>
+					明確です。 (個人の感想です)
+				</li>
+			</ul>
+		</li>
+	</ul>
+
+	<p>
+		最近ちょっとした文書編集のライブラリみたいなのを書きかけているので、その中で使ったりしています。
+		自分で実装したライブラリだと新規設計で始められるし機能追加や不具合修正もすぐにできるので、全体的にとても楽です。
+		皆さんも既存実装に不満があったらさっさと代替を書いて公開してしまいましょう。
+	</p>
+
+	<p>
+		最後に再掲:
+	</p>
+	<ul>
+		<li>
+			<link xl:href="https://crates.io/crates/dendron">crates.io</link>
+		</li>
+		<li>
+			<link xl:href="https://docs.rs/indextree/latest/indextree/">rustdoc (docs.rs)</link>
+		</li>
+		<li>
+			<link xl:href="https://gitlab.com/nop_thread/dendron">リポジトリ (gitlab.com)</link>
+		</li>
+	</ul>
+</section>
+
+</article>
