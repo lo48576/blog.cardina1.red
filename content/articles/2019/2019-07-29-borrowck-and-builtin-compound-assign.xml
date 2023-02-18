@@ -112,7 +112,7 @@ warning[E0502]: cannot borrow `vec_ud` as immutable because it is also borrowed 
 	<programlisting xml:id="code-two-phase-borrow-bad-example-1" language="rust"><![CDATA[fn main() {
     let mut vec = vec![];
     vec.push({
-        vec.push(0);
+        vec.clear();
         0
     });
 }]]></programlisting>
