@@ -666,7 +666,7 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 			</p>
 			<footer>
 				&#x2014;
-				<attribution><link rel="stylesheet" href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
 				<pubdate><time datetime="2017-11-28T00:55:52+0900">2017-11-28 00:55:52</time></pubdate>,
 				<link xl:href="https://mastodon.cardina1.red/@lo48576/99077203745054695"><uri>https://mastodon.cardina1.red/@lo48576/99077203745054695</uri></link>
 			</footer>
@@ -677,7 +677,7 @@ excerpt: "Mastodon と繋がるのは Mastodon だけじゃないんですよ的
 			</p>
 			<footer>
 				&#x2014;
-				<attribution><link rel="stylesheet" href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
+				<attribution><link xl:href="https://mastodon.cardina1.red/@lo48576">@lo48576@mastodon.cardina1.red</link></attribution>,
 				<pubdate><time datetime="2017-11-28T00:57:49+0900">2017-11-28 00:57:49</time></pubdate>,
 				<link xl:href="https://mastodon.cardina1.red/@lo48576/99077211375451457"><uri>https://mastodon.cardina1.red/@lo48576/99077211375451457</uri></link>
 			</footer>

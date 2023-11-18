@@ -29,7 +29,7 @@ excerpt: "CSSで喪に服す時代らしい。"
 		</footnote>、少なくともタイにもそういう文化があるらしい。
 	</p>
 	<p>
-		<time datetime="2016-10-13">先日(2016/10/13)</time><link href="https://ja.wikipedia.org/wiki/%E3%83%A9%E3%83%BC%E3%83%9E9%E4%B8%96">タイ国王ラーマ9世</link>の崩御でタイの/タイ国民向けのwebサイトが白黒(正確にはグレースケール)になっているようだが、どうやらこれがwebサイトの色使いを直していくとかでなく、追加のCSSスタイルで簡単に実現できるらしいと知った。
+		<time datetime="2016-10-13">先日(2016/10/13)</time><link xl:href="https://ja.wikipedia.org/wiki/%E3%83%A9%E3%83%BC%E3%83%9E9%E4%B8%96">タイ国王ラーマ9世</link>の崩御でタイの/タイ国民向けのwebサイトが白黒(正確にはグレースケール)になっているようだが、どうやらこれがwebサイトの色使いを直していくとかでなく、追加のCSSスタイルで簡単に実現できるらしいと知った。
 	</p>
 
 	<figure>
@@ -44,14 +44,14 @@ excerpt: "CSSで喪に服す時代らしい。"
 			<mediaobject>
 				<img src="20161015-1406-www_thaiairways_com.png" alt="www.thaiairways.com のスクリーンショット" />
 			</mediaobject>
-			<caption><link href="http://www.thaiairways.com">www.thaiairways.com</link>, <time datetime="2016-10-15T14:06+09:00">2016-10-15 14:06</time> 撮影</caption>
+			<caption><link xl:href="http://www.thaiairways.com">www.thaiairways.com</link>, <time datetime="2016-10-15T14:06+09:00">2016-10-15 14:06</time> 撮影</caption>
 		</figure>
 
 		<figure>
 			<mediaobject>
 				<img src="20161015-1411-www_mcot_net-home-index.png" alt="www.mcot.net のスクリーンショット" />
 			</mediaobject>
-			<caption><link href="http://www.mcot.net/">www.mcot.net</link>, <time datetime="2016-10-15T14:06+09:00">2016-10-15 14:11</time> 撮影</caption>
+			<caption><link xl:href="http://www.mcot.net/">www.mcot.net</link>, <time datetime="2016-10-15T14:06+09:00">2016-10-15 14:11</time> 撮影</caption>
 		</figure>
 
 		<caption>グレースケールになったタイ向けwebサイト</caption>
@@ -108,7 +108,7 @@ body {
 <section xml:id="mourning-with-ie">
 	<title>IEでダイレクトに喪に服す (#字足らず)</title>
 	<p>
-		さて問題は、<link href="https://developer.mozilla.org/ja/docs/Web/CSS/filter#Browser_compatibility">IEがCSS標準のfilterに対応していない</link>ことである。
+		さて問題は、<link xl:href="https://developer.mozilla.org/ja/docs/Web/CSS/filter#Browser_compatibility">IEがCSS標準のfilterに対応していない</link>ことである。
 		よって、IEでは<code>filter: grayscale(1);</code>では喪に服せない。
 		そこで必要になるのが<code>DXImageTransform</code>だ。
 		<code>filter: progid:DXImageTransform.Microsoft.BasicImage(grayscale=1);</code>によってIEでも<code>filter: grayscale(1);</code>と同じ効果を得られる（ようだ）。

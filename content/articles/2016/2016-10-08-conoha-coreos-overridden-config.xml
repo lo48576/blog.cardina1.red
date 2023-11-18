@@ -51,7 +51,7 @@ excerpt: "ConoHaのVPSにCoreOSを入れると、cloud-config.yamlの一部項�
 		<tbody>
 			<tr>
 				<td>
-					hostnameが<link href="https://coreos.com/os/docs/latest/cloud-config.html#hostname">設定ファイル</link>で設定した通りに変更される
+					hostnameが<link xl:href="https://coreos.com/os/docs/latest/cloud-config.html#hostname">設定ファイル</link>で設定した通りに変更される
 				</td>
 				<td>
 					設定ファイルを正しく設定したにも関わらず、ホスト名がIPアドレス由来のもののままになる
@@ -59,7 +59,7 @@ excerpt: "ConoHaのVPSにCoreOSを入れると、cloud-config.yamlの一部項�
 			</tr>
 			<tr>
 				<td>
-					<link href="https://coreos.com/os/docs/latest/cloud-config.html#sshauthorizedkeys">設定ファイル</link>で設定した公開鍵と対になる秘密鍵でSSHログインできるようになる
+					<link xl:href="https://coreos.com/os/docs/latest/cloud-config.html#sshauthorizedkeys">設定ファイル</link>で設定した公開鍵と対になる秘密鍵でSSHログインできるようになる
 				</td>
 				<td>
 					設定ファイルを正しく設定したにも関わらず、SSHの公開鍵によるログインができず、パスワードログインに移行してしまう
