@@ -31,5 +31,5 @@ site_title: '何とは言わない天然水飲みたさ'
 deploy:
   default:
     kind: rsync
-    dst: "www@blog.cardina1.red:"
+    dst: "blog.cardina1.red:"
     options: [ "-av", "--checksum", "--delete-after", "-e", "ssh" ]
