@@ -61,8 +61,6 @@ module Lo48576
     #
     # @return [String] The transformed content
     def run(_content, params = {})
-      Nanoc::Extra::JRubyNokogiriWarner.check_and_warn
-
       if assigns[:layout].nil?
         raise 'The XSL filter can only be run as a layout'
       end
