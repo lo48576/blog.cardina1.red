@@ -20,6 +20,19 @@ code, kbd {
 	@extend %code-inline-block;
 }
 
+kbd.keycombo {
+	kbd:first-child, kbd + kbd {
+		margin: 0 0.2em;
+	}
+}
+kbd.keycap {
+	padding: 0 0.2em;
+	border: 1px solid #eeeef8;
+}
+kbd.keycombo-action-simul {
+	border: 1px solid;
+}
+
 .uri {
 	font-family: $font-family-monospace;
 }
@@ -60,6 +73,14 @@ pre.screen.terminal {
 		// Ignore font settings by sanitize.css.
 		font-family: inherit;
 		font-size: inherit;
+	}
+	kbd.keycap {
+		border: 1px solid;
+		padding: 0 0.2em;
+	}
+	kbd.keycombo-action-simul {
+		border: 1px solid;
+		padding: 0.1em;
 	}
 	.userinput {
 		color: #f84;
